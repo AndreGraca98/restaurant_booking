@@ -13,7 +13,7 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    set_log_cfg(args.log_file, args.log_level.upper())
+    set_log_cfg(".prod.log", args.log_level.upper())
 
     prodLogger.info("Starting restaurant management system ...")
 
@@ -24,9 +24,10 @@ def main():
             try:
                 options(db.conn)
 
-                print("»" * 80)
+                print("»" * 40 + "«" * 40)
+                print("»" * 40 + "«" * 40 + "\n")
             except KeyboardInterrupt:
-                print("\nExiting...")
+                prodLogger.warn("Ending session...")
                 break
 
 

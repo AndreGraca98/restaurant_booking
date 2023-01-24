@@ -14,13 +14,6 @@ orderLogger = logging.getLogger(__name__)
 add_console_handler(orderLogger)
 
 
-class OrderStatus(Enum):
-    PENDING = "Pending"
-    COOKING = "Cooking"
-    READY = "Ready"
-    SERVED = "Served"
-
-
 def item_in_order(menu_orders_df: pd.DataFrame, order_id: int, menu_id: int) -> bool:
     """Check if item is in order
 
@@ -70,6 +63,13 @@ class Orders:
             >>> Orders(conn).add(table_number=1, items=["Burger", "Fries", "Coke"])
             >>> Orders(conn).add(table_number=1, items=[1, "Fries", 3])
         """
+        if not items:
+            orderLogger.info(f"No items to add to table {table_number}")
+            return self
+
+        if isinstance(items, (int, str)):
+            items = [items]
+
         order_datetime = datetime.datetime.now().isoformat(
             sep=" ", timespec="milliseconds"
         )
@@ -84,12 +84,12 @@ class Orders:
         # Add status to kitchen table
         self.kitchen_table.add(
             order_id=current_order_id,
-            status=OrderStatus.PENDING.value,
+            status="Pending",
         )
 
         # Update tables order_id
         self.tables_table.update(
-            f"table_number={table_number}",
+            f"table_number={int(table_number)}",
             col="order_id",
             value=current_order_id,
         )
@@ -182,10 +182,7 @@ class Orders:
             f"Order status: {df_k[df_k.order_id == order_id].status.values.tolist()[0]}"
         )
 
-        if (
-            df_k[df_k.order_id == order_id].status.values.tolist()[0]
-            != OrderStatus.PENDING.value
-        ):
+        if df_k[df_k.order_id == order_id].status.values.tolist()[0] != "Pending":
             orderLogger.warn(
                 f"Order {order_id} is not pending anymore. Cannot cancel order!"
             )

@@ -104,7 +104,7 @@ def main():
 
     # args = parser.parse_args("--log-level DEBUG".split())
 
-    set_log_cfg(args.log_file, args.log_level.upper())
+    set_log_cfg(".dev.log", args.log_level.upper())
 
     devLogger.info("Starting restaurant management system ...")
 

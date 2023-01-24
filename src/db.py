@@ -310,6 +310,20 @@ def create_restaurant_menu(conn: sqlite3.Connection):
     dbLogger.debug(repr(menu))
 
 
+def add_item_to_menu(conn: sqlite3.Connection, name: str, price: int):
+    """Adds an item to the menu
+
+    Args:
+        conn (sqlite3.Connection): Connection to the database
+        name (str): Name of the item
+        price (int): Price of the item
+    """
+    menu = Table("menu", conn)
+    menu.add(name=name.title(), price=int(price))
+
+    dbLogger.debug(repr(menu))
+
+
 def create_restaurant_tables(conn: sqlite3.Connection):
     """Creates the tables for the restaurant
 

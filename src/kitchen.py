@@ -5,10 +5,17 @@ import pandas as pd
 
 from .db import Table
 from .log import add_console_handler
-from .orders import OrderStatus
 
 kitchenLogger = logging.getLogger(__name__)
 add_console_handler(kitchenLogger)
+
+
+order_status = {
+    "Pending": "Cooking",
+    "Cooking": "Ready",
+    "Ready": "Served",
+    "Served": "Served",
+}
 
 
 class Kitchen:
@@ -16,7 +23,7 @@ class Kitchen:
         self.kitchen_table = Table("kitchen", conn)
         self.orders_table = Table("orders", conn)
 
-    def update_status(self, order_id: int, status: OrderStatus):
+    def update_status(self, order_id: int):
         """Update order status
 
         Args:
@@ -29,6 +36,7 @@ class Kitchen:
         Example:
             >>> Kitchen(conn).update(1, OrderStatus.READY)
         """
+
         df_o = self.orders_table.get_df()
         if order_id not in df_o.order_id.values.tolist():
             kitchenLogger.info(f"Invalid order {order_id} .")
@@ -38,11 +46,15 @@ class Kitchen:
 
         kitchenLogger.debug(df_k[df_k.order_id == order_id].status)
 
+        status = str(df_k[df_k.order_id == order_id].status.values[0])
+
+        new_status = order_status[status]
+
         self.kitchen_table.update(
-            f"order_id={order_id}", col="status", value=status.value
+            f"order_id={order_id}", col="status", value=new_status
         )
 
-        kitchenLogger.info(f"Updated order {order_id} status: {status.value}.")
+        kitchenLogger.info(f"Updated order {order_id} status: {new_status}.")
 
         return self
 
