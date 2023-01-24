@@ -8,16 +8,16 @@ def get_parser() -> argparse.ArgumentParser:
     )
 
     def add_common_arguments(parser):
-        parser.add_argument(
-            "--log-path",
-            "--log-file",
-            type=str,
-            nargs="?",
-            dest="log_file",
-            const=str(Path(__file__).parent / ".restaurant.log"),
-            default=None,
-            help="Log file or directory path. If --log-file is not specified it will only display log to console. If using --log-file without a path it will use the current directory. Otherwise it will use the specified path. ",
-        )
+        # parser.add_argument(
+        #     "--log-path",
+        #     "--log-file",
+        #     type=str,
+        #     nargs="?",
+        #     dest="log_file",
+        #     const=str(Path(__file__).parent / ".restaurant.log"),
+        #     default=None,
+        #     help="Log file or directory path. If --log-file is not specified it will only display log to console. If using --log-file without a path it will use the current directory. Otherwise it will use the specified path. ",
+        # )
         parser.add_argument(
             "--log-lvl",
             "--log-level",
@@ -36,11 +36,6 @@ def get_parser() -> argparse.ArgumentParser:
         )
 
         parser.add_argument("-c", "--clean", action="store_true", help="Clean database")
-
-        # TODO: implement exclude pattern
-        # parser.add_argument(
-        #     "--exclude", type=str, help="Exclude files matching this pattern"
-        # )
 
     add_common_arguments(parser)
 

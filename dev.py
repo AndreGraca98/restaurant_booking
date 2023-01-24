@@ -58,6 +58,9 @@ def bookings_example(conn: sqlite3.Connection):
 def orders_example(conn: sqlite3.Connection):
     orders = Orders(conn)
 
+    # See menu
+    orders.menu()
+
     # Get all orders
     orders.show()
 
@@ -74,9 +77,6 @@ def orders_example(conn: sqlite3.Connection):
     orders.show()
     orders.delete(order_datetime="2023-01-24 09:23:11.618")
     orders.show()
-
-    # See menu
-    orders.menu()
 
 
 def kitchen_example(conn: sqlite3.Connection):
@@ -100,9 +100,6 @@ def kitchen_example(conn: sqlite3.Connection):
 def main():
     parser = get_parser()
     args = parser.parse_args()
-    # print(args)
-
-    # args = parser.parse_args("--log-level DEBUG".split())
 
     set_log_cfg(".dev.log", args.log_level.upper())
 
