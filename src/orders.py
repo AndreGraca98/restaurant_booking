@@ -75,7 +75,7 @@ class Orders:
         )
 
         # Add order to orders table
-        self.orders_table.add(order_datetime=order_datetime)
+        self.orders_table.add(order_datetime=order_datetime, paid=0)
         df_o = self.orders_table.get_df()
         current_order_id = df_o[
             df_o.order_datetime == order_datetime
@@ -120,6 +120,18 @@ class Orders:
                 menu_id=menu_id,
             )
             orderLogger.info(f"Added {str(item).title()} to order {current_order_id}")
+
+        df_mo = self.menu_orders_table.get_df()
+        df_mo[df_mo.order_id == current_order_id].menu_id.values.tolist()
+
+        values = self.orders_table.select(
+            f"SELECT menu.price FROM menu INNER JOIN menu_orders ON menu_orders.menu_id = menu.menu_id AND menu_orders.order_id = {current_order_id};"
+        )
+
+        total_price = sum(map(lambda x: x[0], values))
+        self.orders_table.update(
+            f"order_id={current_order_id}", col="total_price", value=total_price
+        )
 
         time.sleep(0.1)  # To avoid saving different orders with same id
 
@@ -186,6 +198,31 @@ class Orders:
         self.kitchen_table.delete(f"order_id={order_id}")
         self.tables_table.delete(f"order_id={order_id}")
         orderLogger.info(f"Deleted order {order_id}")
+        return self
+
+    def pay(self, order_id: int):
+        """Pay order
+
+        Args:
+            order_id (int): Order id
+
+        Returns:
+            _type_: Self
+
+        Example:
+            >>> Order(conn).pay(order_id=1)
+        """
+        df_o = self.orders_table.get_df()
+        if order_id not in df_o.order_id.values.tolist():
+            orderLogger.warn(f"Order {order_id} does not exist.")
+            return self
+
+        if df_o[df_o.order_id == order_id].paid.values.tolist()[0]:
+            orderLogger.warn(f"Order {order_id} is already paid.")
+            return self
+
+        self.orders_table.update(f"order_id={order_id}", col="paid", value=1)
+        orderLogger.info(f"Paid order {order_id} .")
         return self
 
     def show(self):

@@ -56,7 +56,7 @@ class Database:
         self.conn.commit()
 
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY, order_datetime TEXT NOT NULL UNIQUE);"
+            f"CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY, order_datetime TEXT NOT NULL UNIQUE, paid INTEGER NOT NULL, total_price INTEGER);"
         )
         self.conn.commit()
 
