@@ -113,7 +113,9 @@ class Bookings:
 
     def __init__(self, conn: sqlite3.Connection):
         self.bookings_table = Table("bookings", conn)
-        self.tables_numbers = Table("tables", conn).get_df().table_number.values
+        self.tables_numbers = (
+            Table("tables", conn).get_df().table_number.values.tolist()
+        )
 
         bookingsLogger.debug(f"Tables ids: {self.tables_numbers}")
 
@@ -142,7 +144,9 @@ class Bookings:
 
         # Invalid table_id
         if table_number not in self.tables_numbers:
-            bookingsLogger.warn(f"Table {table_number} does not exist.")
+            bookingsLogger.warn(
+                f"Table {table_number} does not exist in {self.tables_numbers}."
+            )
             return self
 
         # validate table is available at reservation_datetime
@@ -347,7 +351,7 @@ def create_dummy_bookings(conn: sqlite3.Connection):
         "2023-02-02 14:00:00",
         "2023-02-01 15:00:00",
     ]
-    table_numbers = [1, 2, 3, 4, 11, 2, 3]
+    table_numbers = [1, 2, 3, 4, 11, 1, 3]
 
     for client_name, client_contact, reservation_datetime, table_number in zip(
         client_names, client_contacts, reservation_datetimes, table_numbers

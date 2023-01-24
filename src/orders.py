@@ -121,9 +121,7 @@ class Orders:
             )
             orderLogger.info(f"Added {str(item).title()} to order {current_order_id}")
 
-        df_mo = self.menu_orders_table.get_df()
-        df_mo[df_mo.order_id == current_order_id].menu_id.values.tolist()
-
+        # Get order price
         values = self.orders_table.select(
             f"SELECT menu.price FROM menu INNER JOIN menu_orders ON menu_orders.menu_id = menu.menu_id AND menu_orders.order_id = {current_order_id};"
         )
