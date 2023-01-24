@@ -2,9 +2,9 @@
 
 ## Requirements
 
-- Python 3.7 or newer
-- Use a web framework such as FastAPI
-- Use a dabatase for storage
+- [x] Python 3.7 or newer
+- [ ] Use a web framework such as FastAPI
+- [x] Use a dabatase for storage
 
 ## Task
 
@@ -24,12 +24,12 @@
 
 #### Support Waiters
 
-- [ ] Provide menu
-- [ ] Take orders from a table (don't allow duplicate orders for the same table)
+- [x] Provide menu
+- [x] Take orders from a table (don't allow duplicate orders for the same table)
 
 #### Support Kitchen
 
-- [ ] See the existing orders (by time, first in first out)
-- [ ] Update status of orders (prepping, cooking, ready)
+- [x] See the existing orders (by time, first in first out)
+- [x] Update status of orders (prepping, cooking, ready)
 
 > We value good practices, clean code, portability, and documentation.

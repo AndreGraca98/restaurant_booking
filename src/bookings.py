@@ -1,14 +1,15 @@
 import datetime
 import logging
+import sqlite3
 from typing import List
 
 import pandas as pd
 
-from .db import Database, Table
+from .db import Table
 from .log import add_console_handler
 
-restaurantLogger = logging.getLogger(__name__)
-add_console_handler(restaurantLogger)
+bookingsLogger = logging.getLogger(__name__)
+add_console_handler(bookingsLogger)
 
 
 def get_reservation_time_limit(reservation_datetime: str, time_limit: int = 60) -> str:
@@ -38,19 +39,21 @@ def get_available_tables(
     reservation_datetime: str,
     time_limit: int = 60,
 ) -> pd.DataFrame:
-    """Get available tables at reservation_datetime.
+    """Get available tables at reservation_datetime
 
     Args:
-        df (pd.DataFrame): Query result from bookings
-        reservation_datetime (str): Reservation datetime in isoformat. YYYY-MM-DD HH:MM:SS
+        tables_numbers (List[int]): List of tables numbers
+        bookings_df (pd.DataFrame): Query result from bookings
+        reservation_datetime (str): Reservation datetime in iso format YYYY-MM-DD HH:MM:SS
         time_limit (int, optional): Time in minutes to add to reservation_datetime. Can be a negative number. Defaults to 60.
 
     Returns:
-        pd.DataFrame: Dataframe with available tables
+        pd.DataFrame: Available tables at reservation_datetime
 
     Example:
-        >>> get_available_tables_df(df, "2023-02-01 12:00:00", 60)
+        >>> get_available_tables([1, 2, 3], bookings_df, "2023-02-01 12:00:00", 60)
     """
+
     time_limit = abs(time_limit)
 
     busy_df = bookings_df[
@@ -82,22 +85,23 @@ def is_table_available(
     """Check if table is available at reservation_datetime
 
     Args:
-        df (pd.DataFrame): Query result from bookings
-        table_id (int): Table id
+        tables_numbers (List[int]): List of tables numbers
+        table_number (int): Table number
+        bookings_df (pd.DataFrame): Query result from bookings
         reservation_datetime (str): Reservation datetime in isoformat. YYYY-MM-DD HH:MM:SS
 
     Returns:
         bool: True if table is available, False otherwise
 
     Example:
-        >>> check_table_availability(df, 1, "2023-02-01 12:00:00")
+        >>> is_table_available(tables_numbers, 1, df, "2023-02-01 12:00:00")
     """
 
     available_tables_numbers = get_available_tables(
         tables_numbers, bookings_df, reservation_datetime
     )
 
-    restaurantLogger.debug(f"Available tables: {available_tables_numbers}")
+    bookingsLogger.debug(f"Available tables: {available_tables_numbers}")
 
     if table_number not in available_tables_numbers:
         return False
@@ -105,44 +109,46 @@ def is_table_available(
 
 
 class Bookings:
-    def __init__(self, db: Database):
-        self.db = db
-        self.bookings_table = Table("bookings", self.db.conn)
-        self.tables_numbers = Table("tables", self.db.conn).query().table_number.values
+    """Bookings class for managing client reservations"""
 
-        restaurantLogger.debug(f"Tables ids: {self.tables_numbers}")
+    def __init__(self, conn: sqlite3.Connection):
+        self.bookings_table = Table("bookings", conn)
+        self.tables_numbers = Table("tables", conn).get_df().table_number.values
+
+        bookingsLogger.debug(f"Tables ids: {self.tables_numbers}")
 
     def add(
         self,
-        client_name: str,
-        client_contact: str,
         reservation_datetime: str,
         table_number: int,
+        client_name: str = None,
+        client_contact: str = None,
     ):
-        """Add a new booking
+        """Add a new booking. The client_name and client_contact are not required but are recommended.
 
         Args:
+            reservation_datetime (str): Reservation datetime in isoformat. YYYY-MM-DD HH:MM:SS
+            table_number (int): Table number
             client_name (str): Client name
             client_contact (str): Client contact
-            reservation_datetime (str): Reservation datetime in isoformat. YYYY-MM-DD HH:MM:SS
-            table_id (int): Table id
 
         Returns:
             _type_: Self
 
         Example:
-            >>> Bookings(db).add("John", "+351 123 456 789", "2023-02-01 12:00:00", 1)
+            >>> Bookings(db).add("2023-02-01 12:00:00", 1, client_name="John", client_contact="+351 111 222 333"
+            >>> Bookings(db).add("2023-02-01 12:00:00", 1)
         """
 
         # Invalid table_id
         if table_number not in self.tables_numbers:
-            restaurantLogger.warn(f"Table {table_number} does not exist.")
+            bookingsLogger.warn(f"Table {table_number} does not exist.")
             return self
 
         # validate table is available at reservation_datetime
-        df = self.bookings_table.query()
+        df = self.bookings_table.get_df()
 
-        restaurantLogger.debug(
+        bookingsLogger.debug(
             f"table_number={table_number} ; df.empty={df.empty} ; available={is_table_available(self.tables_numbers, table_number, df, reservation_datetime)}"
         )
 
@@ -156,12 +162,12 @@ class Bookings:
                 table_number=table_number,
             )
 
-            restaurantLogger.info(
+            bookingsLogger.info(
                 f"Added booking for {client_name} at {reservation_datetime} for table {table_number}"
             )
             return self
 
-        restaurantLogger.warn(
+        bookingsLogger.warn(
             f"Table {table_number} is not available at {reservation_datetime}."
         )
         return self
@@ -192,16 +198,16 @@ class Bookings:
             >>> Bookings(db).update(booking_id=1, table_id=1)
         """
         if not booking_id and not (client_name and client_contact):
-            restaurantLogger.warn(
+            bookingsLogger.warn(
                 "Must provide booking_id or (client_name and client_contact)"
             )
             return self
 
         if not (reservation_datetime or table_number):
-            restaurantLogger.warn("Must provide reservation_datetime or table_id")
+            bookingsLogger.warn("Must provide reservation_datetime or table_id")
             return self
 
-        df = self.bookings_table.query()
+        df = self.bookings_table.get_df()
 
         # Get client booking
         client_booking = df[
@@ -225,7 +231,7 @@ class Bookings:
             bookings_df=df,
             reservation_datetime=reservation_datetime,
         ):
-            restaurantLogger.warn(
+            bookingsLogger.warn(
                 f"Table {table_number} is not available at {reservation_datetime}"
             )
             return self
@@ -237,7 +243,7 @@ class Bookings:
             values=[reservation_datetime, table_number],
         )
 
-        restaurantLogger.info(f"Updated booking {booking_id}.")
+        bookingsLogger.info(f"Updated booking {booking_id}.")
 
         return self
 
@@ -262,20 +268,20 @@ class Bookings:
             >>> Bookings(db).delete(client_name="John", client_contact="+351 123 456 789")
         """
         if not booking_id and not (client_name and client_contact):
-            restaurantLogger.warn(
+            bookingsLogger.warn(
                 "Must provide booking_id or (client_name and client_contact)"
             )
             return self
 
         if booking_id:
             self.bookings_table.delete(f"booking_id={booking_id}")
-            restaurantLogger.info(f"Deleted booking {booking_id}.")
+            bookingsLogger.info(f"Deleted booking {booking_id}.")
             return self
 
         self.bookings_table.delete(
             f"client_name='{client_name}' and client_contact='{client_contact}'"
         )
-        restaurantLogger.info(f"Deleted booking for {client_name}")
+        bookingsLogger.info(f"Deleted booking for {client_name}")
         return self
 
     def show(self):
@@ -285,7 +291,7 @@ class Bookings:
             _type_: Self
 
         Example:
-            >>> Bookings(db).show()
+            >>> Bookings(conn).show()
         """
         self.bookings_table.show()
         return self
@@ -306,38 +312,42 @@ class Bookings:
 
         available_tables = get_available_tables(
             tables_numbers=self.tables_numbers,
-            bookings_df=self.bookings_table.query(),
+            bookings_df=self.bookings_table.get_df(),
             reservation_datetime=reservation_datetime,
             time_limit=time_limit,
         )
-        restaurantLogger.info(
+        bookingsLogger.info(
             f"Available tables at {reservation_datetime} : {available_tables}"
         )
         return self
 
     def __str__(self) -> str:
-        return f"Bookings({str(self.bookings_table)})"
+        return f"{self.__class__.__name__}({str(self.bookings_table)})"
 
     def __repr__(self) -> str:
-        return f"Bookings({repr(self.bookings_table)})"
+        return f"{self.__class__.__name__}({repr(self.bookings_table)})"
 
 
-def create_dummy_bookings(db: Database):
-    bookings = Bookings(db)
-    client_names = ["John", "Mary", "Jack", "Peter"]
+def create_dummy_bookings(conn: sqlite3.Connection):
+    bookings = Bookings(conn)
+    client_names = [None, "John", "Mary", "Jack", None, "Peter"]
     client_contacts = [
         "+351 123 456 789",
+        None,
         "+351 987 654 321",
         "+351 111 222 333",
+        None,
         "+351 444 555 666",
     ]
     reservation_datetimes = [
         "2023-02-01 12:00:00",
         "2023-02-01 13:00:00",
         "2023-02-01 14:00:00",
+        "2023-02-02 11:00:00",
+        "2023-02-02 14:00:00",
         "2023-02-01 15:00:00",
     ]
-    table_numbers = [1, 2, 3, 4]
+    table_numbers = [1, 2, 3, 4, 11, 2, 3]
 
     for client_name, client_contact, reservation_datetime, table_number in zip(
         client_names, client_contacts, reservation_datetimes, table_numbers
@@ -349,7 +359,7 @@ def create_dummy_bookings(db: Database):
             table_number=table_number,
         )
 
-    restaurantLogger.debug(repr(bookings))
+    bookingsLogger.debug(repr(bookings))
 
 
 # ENDFILE

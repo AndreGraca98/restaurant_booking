@@ -56,7 +56,7 @@ class Database:
         self.conn.commit()
 
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY, order_time TEXT NOT NULL);"
+            f"CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY, order_datetime TEXT NOT NULL UNIQUE);"
         )
         self.conn.commit()
 
@@ -66,17 +66,17 @@ class Database:
         self.conn.commit()
 
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, table_number INTEGER NOT NULL UNIQUE, capacity INTEGER NOT NULL, order_id INTEGER);"
+            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, table_number INTEGER NOT NULL UNIQUE, capacity INTEGER NOT NULL, order_id INTEGER UNIQUE);"
         )
         self.conn.commit()
 
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS bookings (booking_id INTEGER PRIMARY KEY, client_name TEXT, client_contact TEXT, reservation_datetime TEXT NOT NULL, table_number INTEGER NOT NULL);"
+            f"CREATE TABLE IF NOT EXISTS bookings (booking_id INTEGER PRIMARY KEY, client_name TEXT UNIQUE, client_contact TEXT UNIQUE, reservation_datetime TEXT NOT NULL, table_number INTEGER NOT NULL);"
         )
         self.conn.commit()
 
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS kitchen (order_id INTEGER, status TEXT);"
+            f"CREATE TABLE IF NOT EXISTS kitchen (kitchen_id INTEGER PRIMARY KEY , order_id INTEGER, status TEXT);"
         )
         self.conn.commit()
 
@@ -133,14 +133,14 @@ class Table:
         dbLogger.debug(f"{stmt}")
         return self.cursor.fetchall()
 
-    def query(self) -> pd.DataFrame:
+    def get_df(self) -> pd.DataFrame:
         """Query a Table
 
         Returns:
             pd.DataFrame: Query result
 
         Example:
-            >>> table.query()
+            >>> table.get_df()
         """
 
         stmt = f"SELECT * FROM '{self.table_name}';"
@@ -224,7 +224,7 @@ class Table:
             value (Any): New value
 
         Example:
-            >>> table.update("booking_id=booking_id AND name=name", "reservation_datetime", "2023-01-01 12:00:00")
+            >>> table.update("booking_id=booking_id AND name=name", col="reservation_datetime", value="2023-01-01 12:00:00")
         """
 
         stmt = f"UPDATE '{self.table_name}' SET '{col}' = ? WHERE {condition};"
@@ -246,7 +246,7 @@ class Table:
             values (List[Any]): New values
 
         Example:
-            >>> table.update_multiple("booking_id=booking_id AND name=name", ["reservation_datetime", "table_id"], ["2023-01-01 12:00:00", 1])
+            >>> table.update_multiple("booking_id=booking_id AND name=name", cols=["reservation_datetime", "table_id"], values=["2023-01-01 12:00:00", 1])
         """
 
         for col, value in zip(cols, values):
@@ -259,32 +259,40 @@ class Table:
 
         self.conn.commit()
 
-    def show(self) -> None:
+    def show(self):
+        """Prints the table
+
+        Returns:
+            Table: Table object
+
+        Example:
+            >>> table.show()
+        """
         dbLogger.info(str(self))
         return self
 
     def __str__(self) -> str:
-        query = self.query()
+        query = self.get_df()
         return f"""Table: {self.table_name}
 Shape: {query.shape}
 ================================================================================
-{query}
+{query if not query.empty else '    ' + ', '.join(list(query.columns))}
 ================================================================================
 """
 
     def __repr__(self) -> str:
-        query = self.query()
+        query = self.get_df()
         return f"Table: {self.table_name} ; Shape: {query.shape} ; Columns: {list(query.columns)}"
 
 
-def create_restaurant_menu(db: Database):
+def create_restaurant_menu(conn: sqlite3.Connection):
     """Creates the menu for the restaurant
 
     Args:
-        db (Database): Database object
+        conn (sqlite3.Connection): Connection to the database
     """
 
-    menu = Table("menu", db.conn)
+    menu = Table("menu", conn)
     menu.add_multiple(
         name=[
             "Chicken Burger",
@@ -302,13 +310,13 @@ def create_restaurant_menu(db: Database):
     dbLogger.debug(repr(menu))
 
 
-def create_restaurant_tables(db: Database):
+def create_restaurant_tables(conn: sqlite3.Connection):
     """Creates the tables for the restaurant
 
     Args:
-        db (Database): Database object
+        conn (sqlite3.Connection): Connection to the database
     """
-    tables = Table("tables", db.conn)
+    tables = Table("tables", conn)
     tables.add_multiple(
         table_number=[11, 2, 3, 4],
         capacity=[4, 4, 2, 2],
@@ -331,10 +339,10 @@ def prepare_database(clean: bool = False):
             db.delete().create()
 
         dbLogger.debug("Creating restaurant tables")
-        create_restaurant_tables(db)
+        create_restaurant_tables(db.conn)
 
         dbLogger.debug("Creating restaurant menu")
-        create_restaurant_menu(db)
+        create_restaurant_menu(db.conn)
 
         dbLogger.debug("Database ready")
 

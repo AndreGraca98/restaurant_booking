@@ -2,12 +2,16 @@ import argparse
 import datetime
 import logging
 import os
+import sqlite3
 import time
 from pathlib import Path
+from typing import List, Union
 
-from src.db import Database, Table, prepare_database
-from src.log import add_console_handler, set_log_cfg
 from src.bookings import Bookings, create_dummy_bookings
+from src.db import Database, Table, prepare_database
+from src.kitchen import Kitchen
+from src.log import add_console_handler, set_log_cfg
+from src.orders import Orders, OrderStatus, create_dummy_orders
 
 rootLogger = logging.getLogger(__name__)
 add_console_handler(rootLogger)
@@ -58,8 +62,8 @@ def get_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def bookings_example(db: Database):
-    bookings = Bookings(db)
+def bookings_example(conn: sqlite3.Connection):
+    bookings = Bookings(conn)
 
     # Get all bookings
     bookings.show()
@@ -70,6 +74,12 @@ def bookings_example(db: Database):
         client_contact="+351 967 515 355",
         reservation_datetime="2023-02-01 12:30:00",
         table_number=4,
+    )
+    bookings.show()
+
+    bookings.add(
+        reservation_datetime="2023-02-02 12:30:00",
+        table_number=11,
     )
     bookings.show()
 
@@ -91,13 +101,54 @@ def bookings_example(db: Database):
         datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
     )
     bookings.show_available_tables("2023-02-01 13:00:00")
-    ...
+
+
+def orders_example(conn: sqlite3.Connection):
+    orders = Orders(conn)
+
+    # Get all orders
+    orders.show()
+
+    # Add orders
+    orders.add(1, [1, 3, 4, "Fries"])
+    orders.add(1, [1, 2, "chicken", "salad", 7])
+    orders.add(2, [1, 2, "chicken", "salad", 7])
+    orders.add(1, [999, "item that doesnt exist"])
+    orders.show()
+
+    # Delete orders
+    orders.delete(1)
+    orders.show()
+    orders.delete(order_datetime="2023-01-24 09:23:11.618")
+    orders.show()
+
+    # See menu
+    orders.menu()
+
+
+def kitchen_example(conn: sqlite3.Connection):
+    kitchen = Kitchen(conn)
+
+    # Show kitchen orders
+    kitchen.show()
+
+    # Get orders sort by timestamp
+    kitchen.orders()
+
+    # Update order status
+    kitchen.update_status(1, OrderStatus.COOKING)
+    kitchen.update_status(2, OrderStatus.SERVED)
+    kitchen.update_status(3, OrderStatus.SERVED)
+    kitchen.update_status(4, OrderStatus.SERVED)
+
+    kitchen.orders()
 
 
 def main():
     parser = get_parser()
     args = parser.parse_args()
-    print(args)
+    # print(args)
+
     # args = parser.parse_args("--log-level DEBUG".split())
 
     set_log_cfg(args.log_file, args.log_level.upper())
@@ -107,30 +158,10 @@ def main():
     prepare_database(clean=args.clean)
 
     with Database() as db:
-        create_dummy_bookings(db)
-        # bookings_example(db)
-
-        # menu = Table("menu", db.conn)
-        # menu.delete()
-        # menu.delete("price > 400")
-        # menu.update('"name" LIKE "% Burger"', col="price", value=500)
-        # menu.update('name = "Pork Burger"', col="price", value=550)
-        # rootLogger.info(menu.show())
-
-        # Bookings(db).show().update(
-        #     client_name="John",
-        #     client_contact="+351 123 456 789",
-        #     reservation_datetime="2023-02-01 13:00:01",
-        # ).show()
-        # Bookings(db).show().update(2, reservation_datetime="2023-02-01 18:00:00").show()
-        # Bookings(db).show().show_available_tables("2023-02-01 12:00:00")
-        # Bookings(db).show().delete(1)
-        # Bookings(db).show().add(
-        #     client_name="André Graça",
-        #     client_contact="+351 967 515 355",
-        #     reservation_datetime="2023-02-01 12:30:00",
-        #     table_id=1,
-        # ).show()
+        create_dummy_bookings(db.conn)
+        bookings_example(db.conn)
+        orders_example(db.conn)
+        kitchen_example(db.conn)
 
         ...
 
