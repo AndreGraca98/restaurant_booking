@@ -16,7 +16,7 @@
 - [x] Changing bookings
 - [x] Cancel bookings
 - [x] Get all bookings
-- [ ] See available tables
+- [x] See available tables
 
 #### Restaurant Management
 

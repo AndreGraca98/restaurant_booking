@@ -10,7 +10,33 @@ dbLogger = logging.getLogger(__name__)
 add_console_handler(dbLogger)
 
 
+def query(conn: sqlite3.Connection, table_name: str) -> pd.DataFrame:
+    """Query a Table
+
+    Args:
+        conn (sqlite3.Connection): Database connection
+        table_name (str): Table name
+
+    Returns:
+        pd.DataFrame: Query result
+    """
+
+    stmt = f"SELECT * FROM '{table_name}';"
+    return pd.read_sql_query(stmt, conn)
+
+    cursor = conn.cursor()
+
+    cursor.execute(stmt)
+    # cursor.execute(f"SELECT * FROM {table_name} ORDER BY name ASC;")
+    menu = cursor.fetchall()
+    # menu = cursor.fetchmany()
+    # menu = cursor.fetchone()
+    return menu
+
+
 class Database:
+    """Database for Restaurant Management System"""
+
     def __init__(self, db_name: str = "restaurant"):
         self.db_name = db_name
 
@@ -40,12 +66,12 @@ class Database:
         self.conn.commit()
 
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, capacity INTEGER NOT NULL, order_id INTEGER);"
+            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, table_number INTEGER NOT NULL UNIQUE, capacity INTEGER NOT NULL, order_id INTEGER);"
         )
         self.conn.commit()
 
         self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS bookings (booking_id INTEGER PRIMARY KEY, client_name TEXT, client_contact TEXT, reservation_datetime TEXT NOT NULL, table_id INTEGER NOT NULL);"
+            f"CREATE TABLE IF NOT EXISTS bookings (booking_id INTEGER PRIMARY KEY, client_name TEXT, client_contact TEXT, reservation_datetime TEXT NOT NULL, table_number INTEGER NOT NULL);"
         )
         self.conn.commit()
 
@@ -94,43 +120,31 @@ class Database:
         self.close()
 
 
-def query(conn: sqlite3.Connection, table_name: str) -> pd.DataFrame:
-    """Query a Table
-
-    Args:
-        conn (sqlite3.Connection): Database connection
-        table_name (str): Table name
-
-    Returns:
-        pd.DataFrame: Query result
-    """
-
-    stmt = f"SELECT * FROM '{table_name}';"
-    return pd.read_sql_query(stmt, conn)
-
-    cursor = conn.cursor()
-
-    cursor.execute(stmt)
-    # cursor.execute(f"SELECT * FROM {table_name} ORDER BY name ASC;")
-    menu = cursor.fetchall()
-    # menu = cursor.fetchmany()
-    # menu = cursor.fetchone()
-    return menu
-
-
 class Table:
+    """Table class for database operations"""
+
     def __init__(self, table_name: str, conn: sqlite3.Connection):
         self.table_name = table_name
         self.conn = conn
         self.cursor = self.conn.cursor()
 
-    def query(self):
-        return query(self.conn, self.table_name)
-
     def select(self, stmt: str):
         self.cursor.execute(stmt)
         dbLogger.debug(f"{stmt}")
         return self.cursor.fetchall()
+
+    def query(self) -> pd.DataFrame:
+        """Query a Table
+
+        Returns:
+            pd.DataFrame: Query result
+
+        Example:
+            >>> table.query()
+        """
+
+        stmt = f"SELECT * FROM '{self.table_name}';"
+        return pd.read_sql_query(stmt, self.conn)
 
     def add(self, **items):
         """Adds a row to table
@@ -246,7 +260,7 @@ class Table:
         self.conn.commit()
 
     def show(self) -> None:
-        print(self)
+        dbLogger.info(str(self))
         return self
 
     def __str__(self) -> str:
@@ -261,6 +275,68 @@ Shape: {query.shape}
     def __repr__(self) -> str:
         query = self.query()
         return f"Table: {self.table_name} ; Shape: {query.shape} ; Columns: {list(query.columns)}"
+
+
+def create_restaurant_menu(db: Database):
+    """Creates the menu for the restaurant
+
+    Args:
+        db (Database): Database object
+    """
+
+    menu = Table("menu", db.conn)
+    menu.add_multiple(
+        name=[
+            "Chicken Burger",
+            "Pork Burger",
+            "Fries",
+            "Soda",
+            "Salad",
+            "Steak",
+            "Chicken",
+            "Pizza",
+        ],
+        price=[500, 550, 200, 100, 300, 700, 600, 400],
+    )
+
+    dbLogger.debug(repr(menu))
+
+
+def create_restaurant_tables(db: Database):
+    """Creates the tables for the restaurant
+
+    Args:
+        db (Database): Database object
+    """
+    tables = Table("tables", db.conn)
+    tables.add_multiple(
+        table_number=[11, 2, 3, 4],
+        capacity=[4, 4, 2, 2],
+    )
+
+    dbLogger.debug(repr(tables))
+
+
+def prepare_database(clean: bool = False):
+    """Prepares the database
+
+    Args:
+        clean (bool, optional): If True, deletes all tables and recreates them. Defaults to False.
+    """
+    dbLogger.info("Preparing database")
+
+    with Database() as db:
+        if clean:
+            dbLogger.debug("Deleting current database tables")
+            db.delete().create()
+
+        dbLogger.debug("Creating restaurant tables")
+        create_restaurant_tables(db)
+
+        dbLogger.debug("Creating restaurant menu")
+        create_restaurant_menu(db)
+
+        dbLogger.debug("Database ready")
 
 
 # ENDFILE

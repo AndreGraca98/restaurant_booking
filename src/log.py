@@ -13,10 +13,21 @@ def add_console_handler(logger):
     logFormatter = logging.Formatter(fmt)
     consoleHandler.setFormatter(logFormatter)
     logger.addHandler(consoleHandler)
+    # print(logger.handlers)
+    # if False:
+    #     logger.propagate = False
 
 
-def set_log_cfg(log_file: Union[str, Path], log_level: str):
+def set_log_cfg(log_file: Union[str, Path] = None, log_level: str = "INFO"):
     # Create directory if it does not exist
+
+    if log_file is None:
+        logging.basicConfig(
+            level=log_level,
+            format=fmt,
+        )
+        return
+
     log_file = Path(log_file).resolve()
     if log_file.is_dir():
         log_file = log_file / ".restaurant.log"
