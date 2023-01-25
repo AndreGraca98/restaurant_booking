@@ -219,6 +219,12 @@ class Bookings:
             | ((df.client_name == client_name) & (df.client_contact == client_contact))
         ]
 
+        if client_booking.empty:
+            bookingsLogger.warn(
+                f"Booking {booking_id} or ({client_name}, {client_contact}) does not exist."
+            )
+            return self
+
         # if values not provided, use values from client_booking
         booking_id = booking_id or int(client_booking.booking_id.values[0])
         client_name = client_name or client_booking.client_name.values[0]

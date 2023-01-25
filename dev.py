@@ -6,7 +6,7 @@ from src.bookings import Bookings, create_dummy_bookings
 from src.db import Database, Table, prepare_database
 from src.kitchen import Kitchen
 from src.log import add_console_handler, set_log_cfg
-from src.orders import Orders, OrderStatus, create_dummy_orders
+from src.orders import Orders, create_dummy_orders
 
 devLogger = logging.getLogger(__name__)
 add_console_handler(devLogger)
@@ -89,10 +89,18 @@ def kitchen_example(conn: sqlite3.Connection):
     kitchen.orders()
 
     # Update order status
-    kitchen.update_status(1, OrderStatus.COOKING)
-    kitchen.update_status(2, OrderStatus.SERVED)
-    kitchen.update_status(3, OrderStatus.PENDING)
-    kitchen.update_status(4, OrderStatus.READY)
+    kitchen.update_status(1)
+    kitchen.update_status(1)
+    kitchen.update_status(1)
+    kitchen.update_status(2)
+    kitchen.update_status(2)
+    kitchen.update_status(2)
+    kitchen.update_status(3)
+    kitchen.update_status(3)
+    kitchen.update_status(3)
+    kitchen.update_status(4)
+    kitchen.update_status(4)
+    kitchen.update_status(4)
 
     kitchen.orders()
 
