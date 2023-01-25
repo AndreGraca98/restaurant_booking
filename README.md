@@ -36,6 +36,10 @@ python prod.py --log-lvl info
 
 ## Task: Create endpoints to cover the following scenarios
 
+- [x] Python 3.7 or newer
+- [ ] Use a web framework such as FastAPI
+- [x] Use a dabatase for storage
+
 ### Support bookings
 
 - [x] Book tables
