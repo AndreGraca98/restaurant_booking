@@ -13,6 +13,7 @@
 ## Requirements
 
 - Pandas
+- python-dateutil
 - Python>=3.7 or newer
 
 ## Setup

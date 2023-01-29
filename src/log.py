@@ -3,16 +3,16 @@ from pathlib import Path
 from typing import Union
 
 __all__ = ["add_console_handler", "set_log_cfg", "fmt"]
-fmt = (
-    "%(asctime)s : %(levelname)s : %(name)s::%(funcName)s::line%(lineno)d : %(message)s"
-)
+fmt = "%(asctime)s : %(levelname)-8s :: %(name)s::%(funcName)s::line_%(lineno)-3d : %(message)s"
 
 
 def add_console_handler(logger):
+
     consoleHandler = logging.StreamHandler()
     logFormatter = logging.Formatter(fmt)
     consoleHandler.setFormatter(logFormatter)
     logger.addHandler(consoleHandler)
+
     # print(logger.handlers)
     # if False:
     #     logger.propagate = False

@@ -2,11 +2,13 @@ import datetime
 import logging
 import sqlite3
 
-from src.bookings import Bookings, Clients, create_dummy_bookings
-from src.db import Database, Table, create_restaurant_menu, create_restaurant_tables
+from src.bookings import Bookings, create_dummy_bookings
+from src.clients import Clients, create_client
+from src.db import Database, Table, create_restaurant_menu
 from src.kitchen import Kitchen
 from src.log import add_console_handler, set_log_cfg
 from src.orders import Orders, create_dummy_orders
+from src.rest_tables import RestaurantTables, create_restaurant_tables
 
 devLogger = logging.getLogger(__name__)
 add_console_handler(devLogger)
@@ -114,18 +116,36 @@ def main():
     devLogger.info("Starting restaurant management system ...")
 
     with Database("restaurant_dev") as db:
-        if args.clean:
-            devLogger.debug("Deleting current database tables")
-            db.delete().create()
+        # if args.clean:
+        #     devLogger.debug("Deleting current database tables")
+        #     db.delete().create()
 
-        devLogger.debug("Creating restaurant tables")
-        create_restaurant_tables(db.conn)
+        # create_restaurant_tables(db.conn)
+        # create_client(db.conn)
 
-        devLogger.debug("Creating restaurant menu")
-        create_restaurant_menu(db.conn)
+        # devLogger.debug("Creating restaurant menu")
+        # create_restaurant_menu(db.conn)
 
-        devLogger.debug("Database ready")
+        # devLogger.debug("Database ready")
 
+        # r_tables = RestaurantTables(db.conn)
+        # r_tables.show()
+        # r_tables.update(11, "table_number", 12)
+        # r_tables.show()
+
+        # clients = Clients(db.conn)
+        # clients.add("andré graça", "+351 967 51 53 55")
+
+        # bookings = Bookings(db.conn)
+        # bookings.add(
+        #     reservation_datetime="2023-02-01 16:00:00",
+        #     table_number=11,
+        #     client_name="someone less cool",
+        #     # client_name="andré graça",
+        #     # client_contact="+351 967 51 53 55",
+        # )
+
+        # print(str(bookings))
         create_dummy_bookings(db.conn)
         # bookings_example(db.conn)
         # orders_example(db.conn)

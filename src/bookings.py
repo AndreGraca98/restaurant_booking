@@ -1,12 +1,15 @@
 import datetime
 import logging
 import sqlite3
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import pandas as pd
+from dateutil import parser
 
+from .clients import Clients
 from .db import Table, all_valid_types, is_int, is_str, is_valid_type
 from .log import add_console_handler
+from .rest_tables import RestaurantTables
 
 bookingsLogger = logging.getLogger(__name__)
 add_console_handler(bookingsLogger)
@@ -108,236 +111,43 @@ def is_table_available(
     return True
 
 
-class Clients:
-    """Clients class for managing clients"""
-
-    def __init__(self, conn: sqlite3.Connection):
-        self.clients_table = Table("clients", conn)
-
-    def _normalize(self, client_name: str, client_contact: str) -> Tuple[str, str]:
-        c_name = client_name.title() if client_name else None
-        c_contact = client_contact.replace(" ", "") if client_contact else None
-        return c_name, c_contact
-
-    def add(self, client_name: str, client_contact: str):
-        """Add a new client
-
-        Args:
-            client_name (str): Client name
-            client_contact (str): Client contact
-
-        Returns:
-            _type_: Self
-
-        Example:
-            >>> Clients(db.conn).add("John", "+351 111 222 333")
-        """
-        if not (is_str(client_name) and is_str(client_contact)):
-            bookingsLogger.error(
-                f"client_name and client_contact must be a str: type(client_name)={type(client_name)} ; type(client_contact)={type(client_contact)}"
-            )
-            return self
-
-        c_name, c_contact = self._normalize(client_name, client_contact)
-
-        self.clients_table.add(
-            client_name=c_name,
-            client_contact=c_contact,
-        )
-
-        return self
-
-    def delete(self, client_id: int):
-        """Remove client by id
-
-        Args:
-            client_id (int): Client id
-
-        Returns:
-            _type_: Self
-
-        Example:
-            >>> Clients(db.conn).remove(1)
-        """
-        if client_id is None or client_id == []:
-            bookingsLogger.error(
-                f"client_id must be a int: type(client_id)={type(client_id)}"
-            )
-            return self
-
-        self.clients_table.delete(f"client_id={client_id}")
-
-        return self
-
-    def get_id(self, client_name: str = None, client_contact: str = None):
-        """Get client by name or contact
-
-        Args:
-            client_name (str): Client name
-            client_contact (str): Client contact
-
-        Returns:
-            _type_: Self
-
-        Example:
-            >>> Clients(db.conn).get_id(client_name="John")
-            >>> Clients(db.conn).get_id(client_contact="+351 111 222 333")
-            >>> Clients(db.conn).get_id(client_name="John", client_contact="+351 111 222 333")
-        """
-
-        c_name, c_contact = self._normalize(client_name, client_contact)
-
-        stmt = "SELECT client_id FROM clients WHERE "
-
-        if c_name is not None and c_contact is not None:
-            stmt += f"client_name='{c_name}' AND client_contact='{c_contact}';"
-        elif c_name is not None:
-            stmt += f"client_name='{c_name}';"
-        elif c_contact is not None:
-            stmt += f"client_contact='{c_contact}';"
-        else:
-            bookingsLogger.error("client_name or client_contact must be provided")
-            return None
-
-        query = self.clients_table.select(stmt)
-
-        # First row, client_id column
-        if query:
-            return int(query[0][0])
-
-        bookingsLogger.warn(f"Client not found: '{c_name}' , '{c_contact}'")
-        return None
-
-    def exists(self, client_name: str = None, client_contact: str = None) -> bool:
-        """Check if client exists
-
-        Args:
-            client_name (str): Client name
-            client_contact (str): Client contact
-
-        Returns:
-            bool: True if client exists, False otherwise
-
-        Example:
-            >>> Clients(db.conn).exists(client_name="John")
-            >>> Clients(db.conn).exists(client_contact="+351 111 222 333")
-            >>> Clients(db.conn).exists(client_name="John", client_contact="+351 111 222 333")
-        """
-        return True if self.get_id(client_name, client_contact) else False
+def normalize_datetime(reservation_datetime: str) -> str:
+    return parser.parse(reservation_datetime).strftime("%Y-%m-%d %H:%M:%S")
 
 
-class Tables:
-    """Tables class for managing restaurant tables"""
-
-    def __init__(self, conn: sqlite3.Connection):
-        self.tables_table = Table("tables", conn)
-
-        self.available_numbers = self.tables_table.as_df.table_number.tolist()
-        self.available_ids = self.tables_table.as_df.table_id.tolist()
-
-    def _normalize(self, table_number: int) -> int:
-        return int(table_number)
-
-    def add(self, table_number: int, capacity: int = 4):
-        """Add a new table
-
-        Args:
-            table_number (int): Table number
-
-        Returns:
-            _type_: Self
-
-        Example:
-            >>> Tables(db.conn).add(1)
-        """
-        if not is_int(table_number):
-            bookingsLogger.error(
-                f"table_number must be a int: type(table_number)={type(table_number)}"
-            )
-            return self
-
-        self.tables_table.add(table_number=table_number, capacity=capacity)
-
-        return self
-
-    def delete(self, table_id: int):
-        """Remove table by id
-
-        Args:
-            table_id (int): Table id
-
-        Returns:
-            _type_: Self
-
-        Example:
-            >>> Tables(db.conn).remove(1)
-        """
-        if table_id is None or table_id == []:
-            bookingsLogger.error(
-                f"table_id must be a int: type(table_id)={type(table_id)}"
-            )
-            return self
-
-        self.tables_table.delete(f"table_id={table_id}")
-
-        return self
-
-    def get_id(self, table_number: int):
-        """Get table by number
-
-        Args:
-            table_number (int): Table number
-
-        Returns:
-            _type_: Self
-
-        Example:
-            >>> Tables(db.conn).get_id(1)
-        """
-        if not is_int(table_number):
-            bookingsLogger.error(
-                f"table_number must be a int: type(table_number)={type(table_number)}"
-            )
-            return None
-
-        # stmt = f"SELECT table_id FROM 'tables' WHERE table_number = {table_number}"
-        # query = self.tables_table.select(stmt)
-
-        df = self.tables_table.as_df
-        query = df[df.table_number == table_number]
-
-        # First row, table_id column
-        if not query.empty:
-            return int(query.table_id.values[0])
-
-        bookingsLogger.warn(f"Table not found: {table_number}")
-        return None
-
-    def exists(self, table_number: int) -> bool:
-        """Check if table exists
-
-        Args:
-            table_number (int): Table number
-
-        Returns:
-            bool: True if table exists, False otherwise
-
-        Example:
-            >>> Tables(db.conn).exists(1)
-        """
-        return True if self.get_id(table_number) else False
-
-
-class Bookings:
+class Bookings(Table):
     """Bookings class for managing client reservations"""
 
     def __init__(self, conn: sqlite3.Connection):
-        self.bookings_table = Table("bookings", conn)
+        super().__init__("bookings", conn, order_by="reservation_dt")
 
-        self.restaurant_tables = Tables(conn)
+        self.restaurant_tables = RestaurantTables(conn)
         self.clients = Clients(conn)
 
-        # bookingsLogger.debug(f"Tables ids: {self.tables_ids}")
+    def _normalize(
+        self,
+        reservation_datetime: str,
+        table_number: int,
+        client_name: str = None,
+        client_contact: str = None,
+    ) -> Tuple[str, int, Union[str, None], Union[str, None]]:
+        """Normalize booking data
+
+        Args:
+            reservation_datetime (str): Reservation datetime
+            table_number (int): Table number
+            client_name (str, optional): Client name. Defaults to None.
+            client_contact (str, optional): Client contact. Defaults to None.
+
+        Returns:
+            Tuple[str, int, Union[str, None], Union[str, None]]: Normalized data
+        """
+
+        n_dt = normalize_datetime(reservation_datetime)
+        n_t_num = self.restaurant_tables._normalize(table_number)
+        n_c_n, n_c_c = self.clients._normalize(client_name, client_contact)
+
+        return n_dt, n_t_num, n_c_n, n_c_c
 
     def add(
         self,
@@ -349,7 +159,7 @@ class Bookings:
         """Add a new booking. The client_name and client_contact are not required but are recommended.
 
         Args:
-            reservation_datetime (str): Reservation datetime in isoformat. YYYY-MM-DD HH:MM:SS
+            reservation_datetime (str): Reservation datetime
             table_number (int): Table number
             client_name (str): Client name
             client_contact (str): Client contact
@@ -363,47 +173,51 @@ class Bookings:
         """
         # Invalid table_number
         if not self.restaurant_tables.exists(table_number):
-            bookingsLogger.warn(
+            bookingsLogger.error(
                 f"Table {table_number} does not exist in {self.restaurant_tables.available_numbers}."
             )
             return self
 
-        # Get table_id
-        t_id = self.restaurant_tables.get_id(table_number)
+        # Normalize inputs
+        r_dt, t_num, c_n, c_c = self._normalize(
+            reservation_datetime, table_number, client_name, client_contact
+        )
 
-        # Get client_id
-        c_id = self.clients.get_id(client_name, client_contact)
-        if not c_id:
-            # Add client if not exists
-            c_id = self.clients.add(client_name, client_contact).get_id(
-                client_name, client_contact
-            )
+        # Get client_id and try to add client if not exists
+        if self.clients.exists(c_n, c_c):
+            c_id = self.clients.get_id(c_n, c_c)
+        else:
+            c_id = self.clients.add(c_n, c_c).get_id(c_n, c_c)
+            if c_id is None:
+                bookingsLogger.error(f"Failed to add client '{c_n}'")
+                return self
+
+        # Get table_id
+        t_id = self.restaurant_tables.get_id(t_num)
 
         # validate table is available at reservation_datetime
-        df = self.bookings_table.as_df
+        df = self.as_df
 
         t_available = is_table_available(
-            self.restaurant_tables.available_ids, t_id, df, reservation_datetime
+            self.restaurant_tables.available_ids, t_id, df, r_dt
         )
 
         bookingsLogger.debug(
-            f"table_number={table_number} ; df.empty={df.empty} ; available={t_available}"
+            f"table_number={t_num} ; df.empty={df.empty} ; available={t_available}"
         )
 
         if df.empty or t_available:
-            self.bookings_table.add(
+            super().add(
                 client_id=c_id,
-                reservation_dt=reservation_datetime,
+                reservation_dt=r_dt,
                 table_id=t_id,
             )
 
-            bookingsLogger.info(
-                f"Added booking for {client_name} at {reservation_datetime} for table {table_number}"
-            )
+            bookingsLogger.info(f"Added booking for {c_n} at {r_dt} for table {t_num}")
             return self
 
         bookingsLogger.warn(
-            f"Table {table_number} is not available at {reservation_datetime}."
+            f"Table {t_num} is not available at {reservation_datetime}."
         )
         return self
 
@@ -433,7 +247,7 @@ class Bookings:
             >>> Bookings(db).update(booking_id=1, table_id=1)
         """
         if not booking_id and not (client_name and client_contact):
-            bookingsLogger.warn(
+            bookingsLogger.error(
                 "Must provide booking_id or (client_name and client_contact)"
             )
             return self
@@ -442,46 +256,49 @@ class Bookings:
             bookingsLogger.warn("Must provide reservation_datetime or table_id")
             return self
 
-        df = self.bookings_table.as_df
+        c_n, c_c = self.clients._normalize(client_name, client_contact)
+        t_num = (
+            self.restaurant_tables._normalize(table_number) if table_number else None
+        )
+        r_dt = (
+            normalize_datetime(reservation_datetime) if reservation_datetime else None
+        )
+
+        c_id = self.clients.get_id(c_n, c_c)
+        t_id = self.restaurant_tables.get_id(t_num)
+
+        df = self.as_df
 
         # Get client booking
-        client_booking = df[
-            (df.booking_id == booking_id)
-            | ((df.client_name == client_name) & (df.client_contact == client_contact))
-        ]
+        client_booking = df[(df.booking_id == booking_id) | (df.client_id == c_id)]
 
         if client_booking.empty:
             bookingsLogger.warn(
-                f"Booking {booking_id} or ({client_name}, {client_contact}) does not exist."
+                f"Booking {booking_id} or ({c_n}, {c_c}) does not exist."
             )
             return self
 
         # if values not provided, use values from client_booking
         booking_id = booking_id or int(client_booking.booking_id.values[0])
-        client_name = client_name or client_booking.client_name.values[0]
-        client_contact = client_contact or client_booking.client_contact.values[0]
-        table_number = table_number or int(client_booking.table_id.values[0])
-        reservation_datetime = (
-            reservation_datetime or client_booking.reservation_datetime.values[0]
-        )
+        c_id = c_id or str(client_booking.client_id.values[0])
+        r_dt = r_dt or client_booking.reservation_dt.values[0]
+        t_id = t_id or int(client_booking.table_id.values[0])
 
         # Checks new availability
         if not is_table_available(
-            tables_numbers=self.tables_ids,
-            table_number=table_number,
+            tables_ids=self.restaurant_tables.available_ids,
+            table_id=t_id,
             bookings_df=df,
-            reservation_datetime=reservation_datetime,
+            reservation_datetime=r_dt,
         ):
-            bookingsLogger.warn(
-                f"Table {table_number} is not available at {reservation_datetime}"
-            )
+            bookingsLogger.warn(f"Table {table_number} is not available at {r_dt}")
             return self
 
         # Update reservation details
-        self.bookings_table.update_multiple(
-            f"booking_id={booking_id} AND client_name='{client_name}' AND client_contact='{client_contact}'",
-            cols=["reservation_datetime", "table_number"],
-            values=[reservation_datetime, table_number],
+        self.update_multiple(
+            f"booking_id={booking_id} AND client_id={c_id}",
+            cols=["reservation_dt", "table_id"],
+            values=[r_dt, t_id],
         )
 
         bookingsLogger.info(f"Updated booking {booking_id}.")
@@ -493,6 +310,7 @@ class Bookings:
         booking_id: int = None,
         client_name: str = None,
         client_contact: str = None,
+        reservation_datetime: str = None,
     ):
         """Delete a booking
 
@@ -514,27 +332,29 @@ class Bookings:
             )
             return self
 
-        if booking_id:
-            self.bookings_table.delete(f"booking_id={booking_id}")
+        if booking_id is not None:
+            super().delete(f"booking_id={booking_id}")
             bookingsLogger.info(f"Deleted booking {booking_id}.")
             return self
 
-        self.bookings_table.delete(
-            f"client_name='{client_name}' and client_contact='{client_contact}'"
+        c_n, c_c = self.clients._normalize(client_name, client_contact)
+        r_dt = (
+            normalize_datetime(reservation_datetime) if reservation_datetime else None
         )
-        bookingsLogger.info(f"Deleted booking for {client_name}")
-        return self
 
-    def show(self):
-        """Show all bookings
+        c_id = self.clients.get_id(c_n, c_c)
 
-        Returns:
-            _type_: Self
+        if c_id is None:
+            bookingsLogger.warn(f"Booking for {client_name} does not exist.")
+            return self
 
-        Example:
-            >>> Bookings(conn).show()
-        """
-        self.bookings_table.show()
+        if r_dt is not None:
+            super().delete(f"client_id={c_id} AND reservation_dt='{r_dt}'")
+            bookingsLogger.info(f"Deleted booking for {client_name} at {r_dt}")
+            return self
+
+        super().delete(f"client_id={c_id}")
+        bookingsLogger.info(f"Deleted all bookings for {client_name}")
         return self
 
     def show_available_tables(self, reservation_datetime: str, time_limit: int = 60):
@@ -551,56 +371,63 @@ class Bookings:
             >>> Bookings(db).show_available_tables(reservation_datetime="2023-02-01 12:00:00")
         """
 
+        r_dt = normalize_datetime(reservation_datetime)
+
         available_tables = get_available_tables(
-            tables_numbers=self.tables_ids,
-            bookings_df=self.bookings_table.as_df,
-            reservation_datetime=reservation_datetime,
-            time_limit=time_limit,
+            tables_ids=self.restaurant_tables.available_ids,
+            bookings_df=self.as_df,
+            reservation_datetime=r_dt,
         )
         bookingsLogger.info(
             f"Available tables at {reservation_datetime} : {available_tables}"
         )
         return self
 
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}({str(self.bookings_table)})"
-
-    def __repr__(self) -> str:
-        return f"{self.__class__.__name__}({repr(self.bookings_table)})"
-
 
 def create_dummy_bookings(conn: sqlite3.Connection):
-    client_names = [None, "John", "Mary", "Jack", None, "Peter"]
-    client_contacts = [
-        "+351 123 456 789",
-        None,
-        "+351 987 654 321",
-        "+351 111 222 333",
-        None,
-        "+351 444 555 666",
-    ]
-    reservation_datetimes = [
-        "2023-02-01 12:00:00",
-        "2023-02-01 13:00:00",
-        "2023-02-01 14:00:00",
-        "2023-02-02 11:00:00",
-        "2023-02-02 14:00:00",
-        "2023-02-01 15:00:00",
-    ]
-    table_numbers = [11, 2, 3, 4, 11, 1]
+    # client_names = [None, "John", "Mary", "Jack", None, "Peter"]
+    # client_contacts = [
+    #     "+351 123 456 789",
+    #     None,
+    #     "+351 987 654 321",
+    #     "+351 111 222 333",
+    #     None,
+    #     "+351 444 555 666",
+    # ]
+    # reservation_datetimes = [
+    #     "2023-02-01 12:00:00",
+    #     "2023-02-01 13:00:00",
+    #     "2023-02-01 14:00:00",
+    #     "2023-02-02 11:00:00",
+    #     "2023-02-02 14:00:00",
+    #     "2023-02-01 15:00:00",
+    # ]
+    # table_numbers = [11, 2, 3, 4, 11, 1]
+
+    # bookings = Bookings(conn)
+    # for client_name, client_contact, reservation_datetime, table_number in zip(
+    #     client_names, client_contacts, reservation_datetimes, table_numbers
+    # ):
+    #     bookings.add(
+    #         reservation_datetime=reservation_datetime,
+    #         table_number=table_number,
+    #         client_name=client_name,
+    #         client_contact=client_contact,
+    #     )
+
+    # bookingsLogger.debug(repr(bookings))
 
     bookings = Bookings(conn)
-    for client_name, client_contact, reservation_datetime, table_number in zip(
-        client_names, client_contacts, reservation_datetimes, table_numbers
-    ):
-        bookings.add(
-            reservation_datetime=reservation_datetime,
-            table_number=table_number,
-            client_name=client_name,
-            client_contact=client_contact,
-        )
+    bookings.add("2023/02/01 12:00", 11, "John", "+351 123 456 789")
+    bookings.add("2023/02/01 12:00", 2, "andré graça")
 
-    bookingsLogger.debug(repr(bookings))
+    bookings.show()
+
+    bookings.update(booking_id=1, table_number=2)
+    bookings.update(client_name="andré graça", table_number=3)
+
+    bookings.show()
+    bookings.show_available_tables("2023/02/01 12:00")
 
 
 # ENDFILE

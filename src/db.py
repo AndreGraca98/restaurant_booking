@@ -212,10 +212,17 @@ class Database:
 class Table:
     """Table class for database operations"""
 
-    def __init__(self, table_name: str, conn: sqlite3.Connection):
+    def __init__(
+        self,
+        table_name: str,
+        conn: sqlite3.Connection,
+        order_by: Union[str, List[str]] = None,
+    ):
         self.table_name = table_name
         self.conn = conn
         self.cursor = self.conn.cursor()
+
+        self.order_by = order_by
 
     @property
     def as_df(self) -> pd.DataFrame:
@@ -417,6 +424,8 @@ class Table:
 
     def __str__(self) -> str:
         df = self.as_df
+        if self.order_by:
+            df = df.sort_values(by=self.order_by)
         return f"""Table: {self.table_name}
 Shape: {df.shape}
 ================================================================================
@@ -426,6 +435,8 @@ Shape: {df.shape}
 
     def __repr__(self) -> str:
         df = self.as_df
+        if self.order_by:
+            df = df.sort_values(by=self.order_by)
         return f"Table: {self.table_name} ; Shape: {df.shape} ; Columns: {list(df.columns)}"
 
 
