@@ -17,6 +17,20 @@ def is_str(value: Any) -> bool:
     return False
 
 
+def is_int(value: Any) -> bool:
+    """Check if value is of type int"""
+    if isinstance(value, int):
+        return True
+    return False
+
+
+def is_float(value: Any) -> bool:
+    """Check if value is of type float"""
+    if isinstance(value, float):
+        return True
+    return False
+
+
 def is_valid_type(value: Any) -> bool:
     """Check if value is a valid type for the database
 
@@ -26,7 +40,7 @@ def is_valid_type(value: Any) -> bool:
     Returns:
         bool: True if value is of type str, int or float, False otherwise
     """
-    if isinstance(value, (str, int, float)):
+    if isinstance(value, (str, int, float, type(None))):
         return True
     return False
 
@@ -47,6 +61,7 @@ def all_valid_types(values: List[Any]) -> bool:
 
 def _execute_stmt(
     conn: sqlite3.Connection,
+    cursor: sqlite3.Cursor,
     stmt: str,
     values: Union[List, str, int, float] = None,
 ) -> None:
@@ -75,7 +90,6 @@ def _execute_stmt(
         values = [values]
 
     try:
-        cursor = conn.cursor()
         cursor.execute(stmt, values)
         conn.commit()
         dbLogger.debug(f"{stmt} {values}")
@@ -110,7 +124,7 @@ class Database:
             stmt (str): SQL statement
             values (List[Any], optional): Values to be inserted. Defaults to None.
         """
-        _execute_stmt(self.conn, stmt, values)
+        _execute_stmt(self.conn, self.cursor, stmt, values)
 
     def create(self):
         dbLogger.debug("Creating database ...")
@@ -127,7 +141,7 @@ class Database:
 
         # Create restaurant tables table
         self._execute(
-            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, table_number INTEGER NOT NULL , capacity INTEGER NOT NULL, order_id INTEGER UNIQUE);"
+            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, table_number INTEGER UNIQUE NOT NULL , capacity INTEGER NOT NULL, order_id INTEGER UNIQUE);"
         )
 
         # Create menu table
@@ -224,7 +238,7 @@ class Table:
             stmt (str): SQL statement
             values (List[Any], optional): Values to be inserted. Defaults to None.
         """
-        _execute_stmt(self.conn, stmt, values)
+        _execute_stmt(self.conn, self.cursor, stmt, values)
 
     def select(self, stmt: str) -> List[Any]:
         """Selects rows from table
@@ -251,7 +265,8 @@ class Table:
             return []
 
         self._execute(stmt=stmt)
-        return self.cursor.fetchall()
+        result = self.cursor.fetchall()
+        return result
 
     def add(self, **items):
         """Adds a row to table
@@ -272,8 +287,7 @@ class Table:
 
         stmt = f"INSERT INTO '{self.table_name}' ({cols}) VALUES ({qm});"
 
-        self.cursor.execute(stmt, values)
-        # self._execute(stmt, values)
+        self._execute(stmt, values)
 
         return self
 
@@ -302,8 +316,7 @@ class Table:
 
         for values in zip(*values_list):
             stmt = f"INSERT INTO '{self.table_name}' ({cols}) VALUES ({qm});"
-            self.cursor.execute(stmt, values)
-            # self._execute(stmt, values)
+            self._execute(stmt, values)
 
         return self
 
@@ -463,7 +476,7 @@ def create_restaurant_tables(conn: sqlite3.Connection):
     """
     tables = Table("tables", conn)
     tables.add_multiple(
-        table_number=[1, 2, 3, 4],
+        table_number=[11, 2, 3, 4],
         capacity=[4, 4, 2, 2],
     )
 

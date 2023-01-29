@@ -2,7 +2,7 @@ import datetime
 import logging
 import sqlite3
 
-from src.bookings import Bookings, create_dummy_bookings
+from src.bookings import Bookings, Clients, create_dummy_bookings
 from src.db import Database, Table, create_restaurant_menu, create_restaurant_tables
 from src.kitchen import Kitchen
 from src.log import add_console_handler, set_log_cfg
@@ -127,9 +127,9 @@ def main():
         devLogger.debug("Database ready")
 
         create_dummy_bookings(db.conn)
-        bookings_example(db.conn)
-        orders_example(db.conn)
-        kitchen_example(db.conn)
+        # bookings_example(db.conn)
+        # orders_example(db.conn)
+        # kitchen_example(db.conn)
 
         ...
 
