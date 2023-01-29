@@ -3,43 +3,44 @@ from pathlib import Path
 
 
 def get_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="Syncronize files between two directories"
-    )
+    parser = argparse.ArgumentParser(description="Booking system for a restaurant.")
 
     def add_common_arguments(parser):
-        # parser.add_argument(
-        #     "--log-path",
-        #     "--log-file",
-        #     type=str,
-        #     nargs="?",
-        #     dest="log_file",
-        #     const=str(Path(__file__).parent / ".restaurant.log"),
-        #     default=None,
-        #     help="Log file or directory path. If --log-file is not specified it will only display log to console. If using --log-file without a path it will use the current directory. Otherwise it will use the specified path. ",
-        # )
+        class UpperAction(argparse.Action):
+            def __call__(self, parser, namespace, values: str, option_string=None):
+                setattr(
+                    namespace,
+                    self.dest,
+                    int(values) if values.isnumeric() else values.upper(),
+                )
+
         parser.add_argument(
             "--log-lvl",
             "--log-level",
             type=str,
             dest="log_level",
             default="INFO",
+            action=UpperAction,
             help="Log level. Defaults to INFO.",
         )
-        parser.add_argument(
-            "-d",
-            "--dry",
-            "--dry-run",
-            action="store_true",
-            dest="dry_run",
-            help="Dry run the syncronization",
-        )
 
-        parser.add_argument("-c", "--clean", action="store_true", help="Clean database")
+        parser.add_argument(
+            "-c", "--clean", action="store_true", help="Clean database tables"
+        )
 
     add_common_arguments(parser)
 
     return parser
 
+
+if __name__ == "__main__":
+    parser = get_parser()
+    args = parser.parse_args()
+
+    print("Args:", args)
+
+    import logging
+
+    print(logging._nameToLevel)
 
 # ENDFILE

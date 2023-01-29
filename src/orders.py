@@ -44,6 +44,7 @@ class Orders:
         self.menu_orders_table = Table("menu_orders", conn)
         self.menu_table = Table("menu", conn)
         self.kitchen_table = Table("kitchen", conn)
+
         self.tables_table = Table("tables", conn)
 
         self.menu_df = self.menu_table.as_df
@@ -75,10 +76,11 @@ class Orders:
         )
 
         # Add order to orders table
-        self.orders_table.add(order_datetime=order_datetime, paid=0)
+        self.orders_table.add(order_dt=order_datetime, paid=0, total_price=0)
+
         df_o = self.orders_table.as_df
         current_order_id = df_o[
-            df_o.order_datetime == order_datetime
+            df_o.order_dt == order_datetime
         ].order_id.values.tolist()[0]
 
         # Add status to kitchen table
@@ -163,7 +165,7 @@ class Orders:
 
         if not order_id:
             df_o = self.orders_table.as_df
-            df_o = df_o[df_o.order_datetime == order_datetime].order_id.values.tolist()
+            df_o = df_o[df_o.order_dt == order_datetime].order_id.values.tolist()
             if not df_o:
                 orderLogger.warn(
                     f"Order with order_datetime {order_datetime} does not exist."
@@ -255,9 +257,9 @@ def create_dummy_orders(conn: sqlite3.Connection):
     orders.add(1, [1, 3, 4, "Fries"])
     orders.add(1, [1, 2, "chicken", "salad"])
     orders.add(2, [1, 2, "chicken", "salad"])
-    # orders.add(3, [999, "item that doesnt exist"])
+    orders.add(3, [999, "item that doesnt exist"])
 
-    orderLogger.debug(repr(orders))
+    orders.show()
 
 
 # ENDFILE

@@ -40,7 +40,8 @@ def is_valid_type(value: Any) -> bool:
     Returns:
         bool: True if value is of type str, int or float, False otherwise
     """
-    if isinstance(value, (str, int, float, type(None))):
+    if isinstance(value, (str, int, float)):
+        # if isinstance(value, (str, int, float, type(None))):
         return True
     return False
 
@@ -105,12 +106,14 @@ def _execute_stmt(
 class Database:
     """Database for Restaurant Management System"""
 
-    def __init__(self, db_name: str = "restaurant"):
+    def __init__(self, db_name: str = "restaurant", clean: bool = False):
         self.db_name = db_name
 
         self.conn = sqlite3.connect(f"{self.db_name}.sqlite3")
         self.cursor = self.conn.cursor()
 
+        if clean:
+            self.delete()
         self.create()
 
     def close(self):
@@ -127,7 +130,12 @@ class Database:
         _execute_stmt(self.conn, self.cursor, stmt, values)
 
     def create(self):
-        dbLogger.debug("Creating database ...")
+        """Create database tables
+
+        Returns:
+            _type_: self
+        """
+        dbLogger.debug("Creating database tables if inexistent...")
 
         # Create client table
         self._execute(
@@ -185,7 +193,12 @@ class Database:
         return self
 
     def delete(self):
-        dbLogger.debug("Deleting database ...")
+        """Delete database tables
+
+        Returns:
+            _type_: Self
+        """
+        dbLogger.debug("Deleting database tables ...")
         result = self.cursor.execute(
             "SELECT name FROM sqlite_master WHERE type='table';"
         ).fetchall()
@@ -425,7 +438,11 @@ class Table:
     def __str__(self) -> str:
         df = self.as_df
         if self.order_by:
-            df = df.sort_values(by=self.order_by)
+            try:
+                df = df.sort_values(by=self.order_by)
+            except KeyError:
+                dbLogger.warning(f"Cannot sort by {self.order_by}")
+
         return f"""Table: {self.table_name}
 Shape: {df.shape}
 ================================================================================
@@ -436,7 +453,11 @@ Shape: {df.shape}
     def __repr__(self) -> str:
         df = self.as_df
         if self.order_by:
-            df = df.sort_values(by=self.order_by)
+            try:
+                df = df.sort_values(by=self.order_by)
+            except KeyError:
+                dbLogger.warning(f"Cannot sort by {self.order_by}")
+
         return f"Table: {self.table_name} ; Shape: {df.shape} ; Columns: {list(df.columns)}"
 
 
@@ -462,7 +483,7 @@ def create_restaurant_menu(conn: sqlite3.Connection):
         price=[500, 550, 200, 100, 300, 700, 600, 400],
     )
 
-    dbLogger.debug(repr(menu))
+    menu.show()
 
 
 def add_item_to_menu(conn: sqlite3.Connection, name: str, price: int):
@@ -476,22 +497,7 @@ def add_item_to_menu(conn: sqlite3.Connection, name: str, price: int):
     menu = Table("menu", conn)
     menu.add(name=name.title(), price=int(price))
 
-    dbLogger.debug(repr(menu))
-
-
-def create_restaurant_tables(conn: sqlite3.Connection):
-    """Creates the tables for the restaurant
-
-    Args:
-        conn (sqlite3.Connection): Connection to the database
-    """
-    tables = Table("tables", conn)
-    tables.add_multiple(
-        table_number=[11, 2, 3, 4],
-        capacity=[4, 4, 2, 2],
-    )
-
-    dbLogger.debug(repr(tables))
+    dbLogger.info(repr(menu))
 
 
 # ENDFILE

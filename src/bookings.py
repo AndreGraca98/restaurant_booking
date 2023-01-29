@@ -191,6 +191,7 @@ class Bookings(Table):
             if c_id is None:
                 bookingsLogger.error(f"Failed to add client '{c_n}'")
                 return self
+            bookingsLogger.info(f"Added client '{c_n}' , '{c_c}'")
 
         # Get table_id
         t_id = self.restaurant_tables.get_id(t_num)
@@ -281,7 +282,7 @@ class Bookings(Table):
         # if values not provided, use values from client_booking
         booking_id = booking_id or int(client_booking.booking_id.values[0])
         c_id = c_id or str(client_booking.client_id.values[0])
-        r_dt = r_dt or client_booking.reservation_dt.values[0]
+        r_dt = r_dt or str(client_booking.reservation_dt.values[0])
         t_id = t_id or int(client_booking.table_id.values[0])
 
         # Checks new availability
@@ -295,13 +296,12 @@ class Bookings(Table):
             return self
 
         # Update reservation details
+        bookingsLogger.info(f"Updating booking {booking_id}.")
         self.update_multiple(
             f"booking_id={booking_id} AND client_id={c_id}",
             cols=["reservation_dt", "table_id"],
             values=[r_dt, t_id],
         )
-
-        bookingsLogger.info(f"Updated booking {booking_id}.")
 
         return self
 
@@ -311,6 +311,7 @@ class Bookings(Table):
         client_name: str = None,
         client_contact: str = None,
         reservation_datetime: str = None,
+        table_number: int = None,
     ):
         """Delete a booking
 
@@ -338,9 +339,6 @@ class Bookings(Table):
             return self
 
         c_n, c_c = self.clients._normalize(client_name, client_contact)
-        r_dt = (
-            normalize_datetime(reservation_datetime) if reservation_datetime else None
-        )
 
         c_id = self.clients.get_id(c_n, c_c)
 
@@ -348,13 +346,36 @@ class Bookings(Table):
             bookingsLogger.warn(f"Booking for {client_name} does not exist.")
             return self
 
-        if r_dt is not None:
+        t_num = (
+            self.restaurant_tables._normalize(table_number) if table_number else None
+        )
+        t_id = self.restaurant_tables.get_id(t_num)
+
+        r_dt = (
+            normalize_datetime(reservation_datetime) if reservation_datetime else None
+        )
+
+        if t_id is not None and r_dt is not None:
+            bookingsLogger.info(
+                f"Deleting booking for {client_name} at {r_dt} and table {table_number}"
+            )
+            super().delete(
+                f"client_id={c_id} AND table_id={t_id} AND reservation_dt='{r_dt}'"
+            )
+            return self
+        elif t_id is not None:
+            bookingsLogger.info(
+                f"Deleting booking for {client_name} at table {table_number}"
+            )
+            super().delete(f"client_id={c_id} AND table_id={t_id}")
+            return self
+        elif r_dt is not None:
+            bookingsLogger.info(f"Deleting booking for {client_name} at {r_dt}")
             super().delete(f"client_id={c_id} AND reservation_dt='{r_dt}'")
-            bookingsLogger.info(f"Deleted booking for {client_name} at {r_dt}")
             return self
 
+        bookingsLogger.info(f"Deleting all bookings for {client_name}")
         super().delete(f"client_id={c_id}")
-        bookingsLogger.info(f"Deleted all bookings for {client_name}")
         return self
 
     def show_available_tables(self, reservation_datetime: str, time_limit: int = 60):
@@ -378,56 +399,42 @@ class Bookings(Table):
             bookings_df=self.as_df,
             reservation_datetime=r_dt,
         )
-        bookingsLogger.info(
-            f"Available tables at {reservation_datetime} : {available_tables}"
-        )
+        bookingsLogger.info(f"Available tables at {r_dt} : {available_tables}")
         return self
 
 
 def create_dummy_bookings(conn: sqlite3.Connection):
-    # client_names = [None, "John", "Mary", "Jack", None, "Peter"]
-    # client_contacts = [
-    #     "+351 123 456 789",
-    #     None,
-    #     "+351 987 654 321",
-    #     "+351 111 222 333",
-    #     None,
-    #     "+351 444 555 666",
-    # ]
-    # reservation_datetimes = [
-    #     "2023-02-01 12:00:00",
-    #     "2023-02-01 13:00:00",
-    #     "2023-02-01 14:00:00",
-    #     "2023-02-02 11:00:00",
-    #     "2023-02-02 14:00:00",
-    #     "2023-02-01 15:00:00",
-    # ]
-    # table_numbers = [11, 2, 3, 4, 11, 1]
-
-    # bookings = Bookings(conn)
-    # for client_name, client_contact, reservation_datetime, table_number in zip(
-    #     client_names, client_contacts, reservation_datetimes, table_numbers
-    # ):
-    #     bookings.add(
-    #         reservation_datetime=reservation_datetime,
-    #         table_number=table_number,
-    #         client_name=client_name,
-    #         client_contact=client_contact,
-    #     )
-
-    # bookingsLogger.debug(repr(bookings))
+    client_names = [None, "John Dog", "Mary HH", "Jack Samuel", None, "Peter P."]
+    client_contacts = [
+        "+351 123 456 789",
+        "old.school@hotmail.com",
+        "+351 987 654 321",
+        "+351 111 222 333",
+        None,
+        "+351 444 555 666",
+    ]
+    reservation_datetimes = [
+        "2023/02/01 12:00",
+        "2023-February-01 13:00",
+        "2023-02-01 14:00:00",
+        "2023-02-02 11:00:00",
+        "2023-02-02 14:00:00",
+        "2023-02-01 15:00:00",
+    ]
+    table_numbers = [11, 2, 3, 4, 11, 1]
 
     bookings = Bookings(conn)
-    bookings.add("2023/02/01 12:00", 11, "John", "+351 123 456 789")
-    bookings.add("2023/02/01 12:00", 2, "andré graça")
+    for client_name, client_contact, reservation_datetime, table_number in zip(
+        client_names, client_contacts, reservation_datetimes, table_numbers
+    ):
+        bookings.add(
+            reservation_datetime=reservation_datetime,
+            table_number=table_number,
+            client_name=client_name,
+            client_contact=client_contact,
+        )
 
     bookings.show()
-
-    bookings.update(booking_id=1, table_number=2)
-    bookings.update(client_name="andré graça", table_number=3)
-
-    bookings.show()
-    bookings.show_available_tables("2023/02/01 12:00")
 
 
 # ENDFILE

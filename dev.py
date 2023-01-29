@@ -2,6 +2,7 @@ import datetime
 import logging
 import sqlite3
 
+from booking_parser import get_parser
 from src.bookings import Bookings, create_dummy_bookings
 from src.clients import Clients, create_client
 from src.db import Database, Table, create_restaurant_menu
@@ -12,8 +13,6 @@ from src.rest_tables import RestaurantTables, create_restaurant_tables
 
 devLogger = logging.getLogger(__name__)
 add_console_handler(devLogger)
-
-from booking_parser import get_parser
 
 
 def bookings_example(conn: sqlite3.Connection):
@@ -52,7 +51,9 @@ def bookings_example(conn: sqlite3.Connection):
 
     # See available tables
     bookings.show_available_tables(
-        datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
+        (datetime.datetime.now() + datetime.timedelta(days=3)).isoformat(
+            sep=" ", timespec="seconds"
+        )
     )
     bookings.show_available_tables("2023-02-01 13:00:00")
 
@@ -92,16 +93,17 @@ def kitchen_example(conn: sqlite3.Connection):
 
     # Update order status
     kitchen.update_status(1)
-    kitchen.update_status(1)
-    kitchen.update_status(1)
-    kitchen.update_status(2)
-    kitchen.update_status(2)
-    kitchen.update_status(2)
     kitchen.update_status(3)
+    kitchen.update_status(1)
+    kitchen.update_status(2)
+    kitchen.update_status(2)
+    kitchen.orders()
+    kitchen.update_status(2)
     kitchen.update_status(3)
     kitchen.update_status(3)
     kitchen.update_status(4)
     kitchen.update_status(4)
+    kitchen.update_status(1)
     kitchen.update_status(4)
 
     kitchen.orders()
@@ -111,56 +113,35 @@ def main():
     parser = get_parser()
     args = parser.parse_args()
 
-    set_log_cfg(".dev.log", args.log_level.upper())
+    set_log_cfg(".dev.log", args.log_level)
 
     devLogger.info("Starting restaurant management system ...")
 
-    with Database("restaurant_dev") as db:
-        # if args.clean:
-        #     devLogger.debug("Deleting current database tables")
-        #     db.delete().create()
+    with Database("restaurant_dev", args.clean) as db:
+        devLogger.debug("Creating restaurant tables")
+        create_restaurant_tables(db.conn)
 
-        # create_restaurant_tables(db.conn)
-        # create_client(db.conn)
+        devLogger.debug("Creating clients")
+        create_client(db.conn)
 
-        # devLogger.debug("Creating restaurant menu")
-        # create_restaurant_menu(db.conn)
+        devLogger.debug("Creating restaurant menu")
+        create_restaurant_menu(db.conn)
 
-        # devLogger.debug("Database ready")
-
-        # r_tables = RestaurantTables(db.conn)
-        # r_tables.show()
-        # r_tables.update(11, "table_number", 12)
-        # r_tables.show()
-
-        # clients = Clients(db.conn)
-        # clients.add("andré graça", "+351 967 51 53 55")
-
-        # bookings = Bookings(db.conn)
-        # bookings.add(
-        #     reservation_datetime="2023-02-01 16:00:00",
-        #     table_number=11,
-        #     client_name="someone less cool",
-        #     # client_name="andré graça",
-        #     # client_contact="+351 967 51 53 55",
-        # )
-
-        # print(str(bookings))
+        devLogger.debug("Creating dummy bookings")
         create_dummy_bookings(db.conn)
-        # bookings_example(db.conn)
-        # orders_example(db.conn)
-        # kitchen_example(db.conn)
+
+        devLogger.debug("Database ready...")
+
+        bookings_example(db.conn)
+        orders_example(db.conn)
+        kitchen_example(db.conn)
 
         ...
 
 
 if __name__ == "__main__":
     main()
-    # set_log_cfg(".dev.log", "DEBUG")
 
-    # with Database("restaurant_dev") as db:
-    #     table = Table("clients", db.conn)
-    #     table.add(client_name="André Graça", client_contact="+351 967 515 355")
-
-    #     print(str(table))
     ...
+
+# ENDFILE

@@ -81,12 +81,12 @@ class Kitchen:
         """
 
         values = self.kitchen_table.select(
-            "SELECT orders.order_id, orders.order_datetime, kitchen.status FROM orders INNER JOIN kitchen ON orders.order_id = kitchen.order_id;"
+            "SELECT orders.order_id, orders.order_dt, kitchen.status FROM orders INNER JOIN kitchen ON orders.order_id = kitchen.order_id;"
         )
 
         df_joint = (
-            pd.DataFrame(values, columns=["order_id", "order_datetime", "status"])
-            .sort_values("order_datetime")
+            pd.DataFrame(values, columns=["order_id", "order_dt", "status"])
+            .sort_values("order_dt")
             .reset_index(drop=True)
         )
 
