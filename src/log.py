@@ -23,7 +23,7 @@ def set_log_cfg(log_file: Union[str, Path] = None, log_level: str = "INFO"):
 
     if log_file is None:
         logging.basicConfig(
-            level=log_level,
+            level=log_level.upper(),
             format=fmt,
         )
         return
@@ -37,7 +37,7 @@ def set_log_cfg(log_file: Union[str, Path] = None, log_level: str = "INFO"):
     logging.basicConfig(
         filename=str(log_file),
         filemode="a",
-        level=log_level,
+        level=log_level.upper(),
         format=fmt,
     )
 

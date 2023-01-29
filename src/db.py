@@ -1,6 +1,6 @@
 import logging
 import sqlite3
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Union
 
 import pandas as pd
 
@@ -10,28 +10,82 @@ dbLogger = logging.getLogger(__name__)
 add_console_handler(dbLogger)
 
 
-def query(conn: sqlite3.Connection, table_name: str) -> pd.DataFrame:
-    """Query a Table
+def is_str(value: Any) -> bool:
+    """Check if value is of type str"""
+    if isinstance(value, str):
+        return True
+    return False
+
+
+def is_valid_type(value: Any) -> bool:
+    """Check if value is a valid type for the database
 
     Args:
-        conn (sqlite3.Connection): Database connection
-        table_name (str): Table name
+        value (Any): Value to be checked
 
     Returns:
-        pd.DataFrame: Query result
+        bool: True if value is of type str, int or float, False otherwise
     """
+    if isinstance(value, (str, int, float)):
+        return True
+    return False
 
-    stmt = f"SELECT * FROM '{table_name}';"
-    return pd.read_sql_query(stmt, conn)
 
-    cursor = conn.cursor()
+def all_valid_types(values: List[Any]) -> bool:
+    """Check if all values are of valid type
 
-    cursor.execute(stmt)
-    # cursor.execute(f"SELECT * FROM {table_name} ORDER BY name ASC;")
-    menu = cursor.fetchall()
-    # menu = cursor.fetchmany()
-    # menu = cursor.fetchone()
-    return menu
+    Args:
+        values (List[Any]): List of values to be checked
+
+    Returns:
+        bool: True if all values are of type str, int or float, False otherwise
+    """
+    if all(is_valid_type(value) for value in values):
+        return True
+    return False
+
+
+def _execute_stmt(
+    conn: sqlite3.Connection,
+    stmt: str,
+    values: Union[List, str, int, float] = None,
+) -> None:
+    """Execute an SQL statement
+
+    Args:
+        stmt (str): SQL statement
+        values (List[Any], optional): Values to be inserted. Defaults to None.
+    """
+    if not is_str(stmt):
+        dbLogger.error(f"Invalid SQL statement: {stmt}")
+        return
+
+    if values is not None and not all_valid_types(values):
+        dbLogger.error(
+            f"Invalid values with types: {values} » {list(map(type, values))}"
+        )
+        return
+
+    # If no values, convert to empty list
+    if values is None:
+        values = []
+
+    # If only one item, convert to list with one item
+    if not isinstance(values, (list, tuple)):
+        values = [values]
+
+    try:
+        cursor = conn.cursor()
+        cursor.execute(stmt, values)
+        conn.commit()
+        dbLogger.debug(f"{stmt} {values}")
+
+    except (
+        sqlite3.IntegrityError,  # Invalid constraint
+        sqlite3.OperationalError,  # Table/column does not exist
+        sqlite3.ProgrammingError,  # No parameters suplied
+    ) as e:
+        dbLogger.error(f"{stmt} {values} :: {e}")
 
 
 class Database:
@@ -46,39 +100,55 @@ class Database:
         self.create()
 
     def close(self):
+        dbLogger.debug("Closing database ...")
         self.conn.close()
+
+    def _execute(self, stmt: str, values: List[Any] = None) -> None:
+        """Execute an SQL statement
+
+        Args:
+            stmt (str): SQL statement
+            values (List[Any], optional): Values to be inserted. Defaults to None.
+        """
+        _execute_stmt(self.conn, stmt, values)
 
     def create(self):
         dbLogger.debug("Creating database ...")
-        self.cursor.execute(
+
+        # Create client table
+        self._execute(
+            f"CREATE TABLE IF NOT EXISTS clients (client_id INTEGER PRIMARY KEY, client_name TEXT UNIQUE NOT NULL, client_contact TEXT UNIQUE NOT NULL);"
+        )
+
+        # Create bookings table
+        self._execute(
+            f"CREATE TABLE IF NOT EXISTS bookings (booking_id INTEGER PRIMARY KEY, client_id INTEGER NOT NULL, reservation_dt TEXT NOT NULL, table_id INTEGER NOT NULL);"
+        )
+
+        # Create restaurant tables table
+        self._execute(
+            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, table_number INTEGER NOT NULL , capacity INTEGER NOT NULL, order_id INTEGER UNIQUE);"
+        )
+
+        # Create menu table
+        self._execute(
             f"CREATE TABLE IF NOT EXISTS menu (menu_id INTEGER PRIMARY KEY, name TEXT UNIQUE NOT NULL, price INTEGER NOT NULL);"
         )
-        self.conn.commit()
 
-        self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY, order_datetime TEXT NOT NULL UNIQUE, paid INTEGER NOT NULL, total_price INTEGER);"
+        # Create orders table
+        self._execute(
+            f"CREATE TABLE IF NOT EXISTS orders (order_id INTEGER PRIMARY KEY, order_dt TEXT NOT NULL UNIQUE, paid INTEGER NOT NULL, total_price INTEGER NOT NULL);"
         )
-        self.conn.commit()
 
-        self.cursor.execute(
+        # Create menu_orders table to link menu and orders
+        self._execute(
             f"CREATE TABLE IF NOT EXISTS menu_orders (menu_orders_id INTEGER PRIMARY KEY, menu_id INTEGER NOT NULL, order_id INTEGER NOT NULL);"
         )
-        self.conn.commit()
 
-        self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS tables (table_id INTEGER PRIMARY KEY, table_number INTEGER NOT NULL UNIQUE, capacity INTEGER NOT NULL, order_id INTEGER UNIQUE);"
+        # Create kitchen table
+        self._execute(
+            f"CREATE TABLE IF NOT EXISTS kitchen (kitchen_id INTEGER PRIMARY KEY , order_id INTEGER, status TEXT NOT NULL);"
         )
-        self.conn.commit()
-
-        self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS bookings (booking_id INTEGER PRIMARY KEY, client_name TEXT UNIQUE, client_contact TEXT UNIQUE, reservation_datetime TEXT NOT NULL, table_number INTEGER NOT NULL);"
-        )
-        self.conn.commit()
-
-        self.cursor.execute(
-            f"CREATE TABLE IF NOT EXISTS kitchen (kitchen_id INTEGER PRIMARY KEY , order_id INTEGER, status TEXT);"
-        )
-        self.conn.commit()
 
         return self
 
@@ -108,8 +178,7 @@ class Database:
 
         table_names = sorted(map(lambda x: x[0], result))
         for table_name in table_names:
-            self.cursor.execute(f"DROP TABLE IF EXISTS '{table_name}';")
-            self.conn.commit()
+            self._execute(f"DROP TABLE IF EXISTS '{table_name}';")
 
         return self
 
@@ -118,6 +187,12 @@ class Database:
 
     def __exit__(self, exc_type, exc_value, exc_traceback):
         self.close()
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self.db_name})"
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self.db_name})"
 
 
 class Table:
@@ -128,23 +203,55 @@ class Table:
         self.conn = conn
         self.cursor = self.conn.cursor()
 
-    def select(self, stmt: str):
-        self.cursor.execute(stmt)
-        dbLogger.debug(f"{stmt}")
-        return self.cursor.fetchall()
-
-    def get_df(self) -> pd.DataFrame:
-        """Query a Table
+    @property
+    def as_df(self) -> pd.DataFrame:
+        """Returns a pandas DataFrame of the table
 
         Returns:
             pd.DataFrame: Query result
 
         Example:
-            >>> table.get_df()
+            >>> table.as_df
         """
 
         stmt = f"SELECT * FROM '{self.table_name}';"
         return pd.read_sql_query(stmt, self.conn)
+
+    def _execute(self, stmt: str, values: List[Any] = None) -> None:
+        """Execute an SQL statement
+
+        Args:
+            stmt (str): SQL statement
+            values (List[Any], optional): Values to be inserted. Defaults to None.
+        """
+        _execute_stmt(self.conn, stmt, values)
+
+    def select(self, stmt: str) -> List[Any]:
+        """Selects rows from table
+
+        Args:
+            stmt (str): SQL statement
+
+        Returns:
+            List[Any]: Query result
+
+        Example:
+            >>> table.select("SELECT * FROM table")
+        """
+        if not is_str(stmt):
+            dbLogger.error(f"Invalid SQL statement: {stmt}")
+            return []
+
+        stmt = stmt.strip()  # Remove whitespaces
+        if stmt[~0] != ";":
+            stmt += ";"  # Add semicolon if not present
+
+        if stmt[:6].upper() != "SELECT":
+            dbLogger.error(f"Only SELECT statements are allowed: {stmt}")
+            return []
+
+        self._execute(stmt=stmt)
+        return self.cursor.fetchall()
 
     def add(self, **items):
         """Adds a row to table
@@ -153,19 +260,20 @@ class Table:
 
         Example:
             >>> table.add(price=1, name="a")
+            >>> # INSERT INTO table (price, name) VALUES (1 , "a");
         """
+        if not items:
+            dbLogger.debug(f"No entry to add")
+            return self
+
         cols = ", ".join(list(map(lambda x: f"'{x}'", items.keys())))
         values = list(items.values())
         qm = ", ".join(["?"] * len(values))
 
         stmt = f"INSERT INTO '{self.table_name}' ({cols}) VALUES ({qm});"
 
-        try:
-            self.cursor.execute(stmt, values)
-            dbLogger.debug(f"{stmt} {values}")
-            self.conn.commit()
-        except sqlite3.IntegrityError:
-            dbLogger.debug(f"Duplicate entry: {values}")
+        self.cursor.execute(stmt, values)
+        # self._execute(stmt, values)
 
         return self
 
@@ -176,20 +284,26 @@ class Table:
 
         Example:
             >>> table.add_multiple(price=[1, 2, 3], name=["a", "b", "c"])
+            >>> # INSERT INTO table (price, name) VALUES (1 , "a");
+            >>> # INSERT INTO table (price, name) VALUES (2 , "b");
+            >>> # INSERT INTO table (price, name) VALUES (3 , "c");
         """
+        if not items:
+            dbLogger.debug(f"No entry to add")
+            return self
+
+        if not all(len(v) == len(list(items.values())[0]) for v in items.values()):
+            dbLogger.error(f"Length of lists are not equal : {items}")
+            return self
+
         cols = ", ".join(list(map(lambda x: f"'{x}'", items.keys())))
         values_list = list(items.values())
         qm = ", ".join(["?"] * len(values_list))
 
         for values in zip(*values_list):
             stmt = f"INSERT INTO '{self.table_name}' ({cols}) VALUES ({qm});"
-            try:
-                self.cursor.execute(stmt, values)
-                dbLogger.debug(f"{stmt} {values}")
-            except sqlite3.IntegrityError:
-                dbLogger.debug(f"Duplicate entry: {values}")
-
-        self.conn.commit()
+            self.cursor.execute(stmt, values)
+            # self._execute(stmt, values)
 
         return self
 
@@ -201,17 +315,18 @@ class Table:
 
         Example:
             >>> table.delete("booking_id=booking_id AND name=name")
+            >>> # DELETE FROM table WHERE booking_id=booking_id AND name=name;
             >>> table.delete()
+            >>> # DELETE FROM table;
         """
-        if condition:
-            stmt = f"DELETE FROM '{self.table_name}' WHERE {condition};"
-        else:
-            stmt = f"DELETE FROM '{self.table_name}';"
+        if condition is not None and not is_str(condition):
+            dbLogger.error(f"Invalid condition: {condition}")
+            return self
 
-        dbLogger.debug(stmt)
-        self.cursor.execute(stmt)
+        stmt = f"DELETE FROM '{self.table_name}' "
+        stmt += ";" if condition is None else f"WHERE {condition};"
 
-        self.conn.commit()
+        self._execute(stmt)
 
         return self
 
@@ -225,13 +340,15 @@ class Table:
 
         Example:
             >>> table.update("booking_id=booking_id AND name=name", col="reservation_datetime", value="2023-01-01 12:00:00")
+            >>> # UPDATE table SET 'reservation_datetime' = 2023-01-01 12:00:00 WHERE booking_id=booking_id AND name=name;
         """
+        if not is_str(condition) or condition == "":
+            dbLogger.error(f"Invalid condition: {condition}")
+            return self
 
         stmt = f"UPDATE '{self.table_name}' SET '{col}' = ? WHERE {condition};"
-        dbLogger.debug(f"{stmt} {[value]}")
-        self.cursor.execute(stmt, [value])
 
-        self.conn.commit()
+        self._execute(stmt, [value])
 
         return self
 
@@ -247,17 +364,31 @@ class Table:
 
         Example:
             >>> table.update_multiple("booking_id=booking_id AND name=name", cols=["reservation_datetime", "table_id"], values=["2023-01-01 12:00:00", 1])
+            >>> # UPDATE table SET 'reservation_datetime' = 2023-01-01 12:00:00 WHERE booking_id=booking_id AND name=name;
+            >>> # UPDATE table SET 'table_id' = 1 WHERE booking_id=booking_id AND name=name;
+
         """
+        if not is_str(condition) or condition == "":
+            dbLogger.error(f"Invalid condition: {condition}")
+            return self
+
+        if not isinstance(cols, (list, tuple)) or not isinstance(values, (list, tuple)):
+            dbLogger.error(
+                f"Columns and values must be of type list: cols={type(cols)} ; values={type(values)}"
+            )
+            return self
+
+        if len(cols) != len(values):
+            dbLogger.error(
+                f"Number of columns and values do not match: len(cols)={len(cols)} ; len(values)={len(values)}"
+            )
+            return self
 
         for col, value in zip(cols, values):
             stmt = f"UPDATE '{self.table_name}' SET '{col}' = ? WHERE {condition};"
-            try:
-                self.cursor.execute(stmt, [value])
-                dbLogger.debug(f"{stmt} {[value]}")
-            except sqlite3.IntegrityError:
-                dbLogger.debug(f"Duplicate entry: {value}")
+            self._execute(stmt, [value])
 
-        self.conn.commit()
+        return self
 
     def show(self):
         """Prints the table
@@ -272,17 +403,17 @@ class Table:
         return self
 
     def __str__(self) -> str:
-        query = self.get_df()
+        df = self.as_df
         return f"""Table: {self.table_name}
-Shape: {query.shape}
+Shape: {df.shape}
 ================================================================================
-{query if not query.empty else '    ' + ', '.join(list(query.columns))}
+{df if not df.empty else '    ' + ', '.join(list(df.columns))}
 ================================================================================
 """
 
     def __repr__(self) -> str:
-        query = self.get_df()
-        return f"Table: {self.table_name} ; Shape: {query.shape} ; Columns: {list(query.columns)}"
+        df = self.as_df
+        return f"Table: {self.table_name} ; Shape: {df.shape} ; Columns: {list(df.columns)}"
 
 
 def create_restaurant_menu(conn: sqlite3.Connection):
@@ -332,33 +463,11 @@ def create_restaurant_tables(conn: sqlite3.Connection):
     """
     tables = Table("tables", conn)
     tables.add_multiple(
-        table_number=[11, 2, 3, 4],
+        table_number=[1, 2, 3, 4],
         capacity=[4, 4, 2, 2],
     )
 
     dbLogger.debug(repr(tables))
-
-
-def prepare_database(clean: bool = False):
-    """Prepares the database
-
-    Args:
-        clean (bool, optional): If True, deletes all tables and recreates them. Defaults to False.
-    """
-    dbLogger.info("Preparing database")
-
-    with Database() as db:
-        if clean:
-            dbLogger.debug("Deleting current database tables")
-            db.delete().create()
-
-        dbLogger.debug("Creating restaurant tables")
-        create_restaurant_tables(db.conn)
-
-        dbLogger.debug("Creating restaurant menu")
-        create_restaurant_menu(db.conn)
-
-        dbLogger.debug("Database ready")
 
 
 # ENDFILE

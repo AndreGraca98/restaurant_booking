@@ -60,14 +60,14 @@ def get_available_tables(
         (
             # give some time for current client to leave
             reservation_datetime
-            >= bookings_df.reservation_datetime.map(
+            >= bookings_df.reservation_dt.map(
                 lambda x: get_reservation_time_limit(x, -time_limit + 1)
             )
         )
         & (
             # give some time for next client to arrive
             reservation_datetime
-            < bookings_df.reservation_datetime.map(
+            < bookings_df.reservation_dt.map(
                 lambda x: get_reservation_time_limit(x, abs(time_limit - 1))
             )
         )
@@ -108,14 +108,20 @@ def is_table_available(
     return True
 
 
+class Clients:
+    """Clients class for managing clients"""
+    
+    def __init__(self, conn: sqlite3.Connection):
+        self.clients_table = Table("clients", conn)
+
+
+
 class Bookings:
     """Bookings class for managing client reservations"""
 
     def __init__(self, conn: sqlite3.Connection):
         self.bookings_table = Table("bookings", conn)
-        self.tables_numbers = (
-            Table("tables", conn).get_df().table_number.values.tolist()
-        )
+        self.tables_numbers = Table("tables", conn).as_df.table_number.values.tolist()
 
         bookingsLogger.debug(f"Tables ids: {self.tables_numbers}")
 
@@ -150,7 +156,7 @@ class Bookings:
             return self
 
         # validate table is available at reservation_datetime
-        df = self.bookings_table.get_df()
+        df = self.bookings_table.as_df
 
         bookingsLogger.debug(
             f"table_number={table_number} ; df.empty={df.empty} ; available={is_table_available(self.tables_numbers, table_number, df, reservation_datetime)}"
@@ -211,7 +217,7 @@ class Bookings:
             bookingsLogger.warn("Must provide reservation_datetime or table_id")
             return self
 
-        df = self.bookings_table.get_df()
+        df = self.bookings_table.as_df
 
         # Get client booking
         client_booking = df[
@@ -322,7 +328,7 @@ class Bookings:
 
         available_tables = get_available_tables(
             tables_numbers=self.tables_numbers,
-            bookings_df=self.bookings_table.get_df(),
+            bookings_df=self.bookings_table.as_df,
             reservation_datetime=reservation_datetime,
             time_limit=time_limit,
         )

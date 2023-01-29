@@ -3,7 +3,7 @@ import logging
 import sqlite3
 
 from src.bookings import Bookings, create_dummy_bookings
-from src.db import Database, Table, prepare_database
+from src.db import Database, Table, create_restaurant_menu, create_restaurant_tables
 from src.kitchen import Kitchen
 from src.log import add_console_handler, set_log_cfg
 from src.orders import Orders, create_dummy_orders
@@ -113,9 +113,19 @@ def main():
 
     devLogger.info("Starting restaurant management system ...")
 
-    prepare_database(clean=args.clean)
+    with Database("restaurant_dev") as db:
+        if args.clean:
+            devLogger.debug("Deleting current database tables")
+            db.delete().create()
 
-    with Database() as db:
+        devLogger.debug("Creating restaurant tables")
+        create_restaurant_tables(db.conn)
+
+        devLogger.debug("Creating restaurant menu")
+        create_restaurant_menu(db.conn)
+
+        devLogger.debug("Database ready")
+
         create_dummy_bookings(db.conn)
         bookings_example(db.conn)
         orders_example(db.conn)
@@ -126,3 +136,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # set_log_cfg(".dev.log", "DEBUG")
+
+    # with Database("restaurant_dev") as db:
+    #     table = Table("clients", db.conn)
+    #     table.add(client_name="André Graça", client_contact="+351 967 515 355")
+
+    #     print(str(table))
+    ...

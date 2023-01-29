@@ -46,7 +46,7 @@ class Orders:
         self.kitchen_table = Table("kitchen", conn)
         self.tables_table = Table("tables", conn)
 
-        self.menu_df = self.menu_table.get_df()
+        self.menu_df = self.menu_table.as_df
 
     def add(self, table_number: int, items: List[Union[int, str]]):
         """Add order to database
@@ -76,7 +76,7 @@ class Orders:
 
         # Add order to orders table
         self.orders_table.add(order_datetime=order_datetime, paid=0)
-        df_o = self.orders_table.get_df()
+        df_o = self.orders_table.as_df
         current_order_id = df_o[
             df_o.order_datetime == order_datetime
         ].order_id.values.tolist()[0]
@@ -109,9 +109,7 @@ class Orders:
                 orderLogger.warn(f"Item {item} does not exist.")
                 continue
 
-            if item_in_order(
-                self.menu_orders_table.get_df(), current_order_id, menu_id
-            ):
+            if item_in_order(self.menu_orders_table.as_df, current_order_id, menu_id):
                 orderLogger.warn(f"Item {item} already in order {current_order_id}")
                 continue
 
@@ -134,7 +132,7 @@ class Orders:
         time.sleep(0.1)  # To avoid saving different orders with same id
 
         # If order is empty remove it
-        df_mo = self.menu_orders_table.get_df()
+        df_mo = self.menu_orders_table.as_df
         if df_mo[df_mo.order_id == current_order_id].empty:
             orderLogger.warn(f"Order {current_order_id} is empty. Deleting order.")
             self.delete(order_id=current_order_id)
@@ -164,7 +162,7 @@ class Orders:
             return self
 
         if not order_id:
-            df_o = self.orders_table.get_df()
+            df_o = self.orders_table.as_df
             df_o = df_o[df_o.order_datetime == order_datetime].order_id.values.tolist()
             if not df_o:
                 orderLogger.warn(
@@ -172,11 +170,11 @@ class Orders:
                 )
                 return self
 
-        if order_id not in self.orders_table.get_df().order_id.values.tolist():
+        if order_id not in self.orders_table.as_df.order_id.values.tolist():
             orderLogger.warn(f"Order {order_id} does not exist.")
             return self
 
-        df_k = self.kitchen_table.get_df()
+        df_k = self.kitchen_table.as_df
 
         orderLogger.debug(
             f"Order status: {df_k[df_k.order_id == order_id].status.values.tolist()[0]}"
@@ -207,7 +205,7 @@ class Orders:
         Example:
             >>> Order(conn).pay(order_id=1)
         """
-        df_o = self.orders_table.get_df()
+        df_o = self.orders_table.as_df
         if order_id not in df_o.order_id.values.tolist():
             orderLogger.warn(f"Order {order_id} does not exist.")
             return self

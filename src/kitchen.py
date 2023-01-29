@@ -37,12 +37,12 @@ class Kitchen:
             >>> Kitchen(conn).update(1, OrderStatus.READY)
         """
 
-        df_o = self.orders_table.get_df()
+        df_o = self.orders_table.as_df
         if order_id not in df_o.order_id.values.tolist():
             kitchenLogger.info(f"Invalid order {order_id} .")
             return self
 
-        df_k = self.kitchen_table.get_df()
+        df_k = self.kitchen_table.as_df
 
         kitchenLogger.debug(df_k[df_k.order_id == order_id].status)
 
