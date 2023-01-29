@@ -1,7 +1,7 @@
 import logging
 
 from booking_parser import get_parser
-from src.db import Database, prepare_database
+from src.db import Database, create_restaurant_menu, create_restaurant_tables
 from src.log import add_console_handler, set_log_cfg
 from src.options import options
 
@@ -17,9 +17,19 @@ def main():
 
     prodLogger.info("Starting restaurant management system ...")
 
-    prepare_database(clean=args.clean)
-
     with Database() as db:
+        prodLogger.info("Preparing database")
+        if args.clean:
+            prodLogger.debug("Deleting current database tables")
+            db.delete().create()
+
+        prodLogger.debug("Creating restaurant tables")
+        create_restaurant_tables(db.conn)
+
+        prodLogger.debug("Creating restaurant menu")
+        create_restaurant_menu(db.conn)
+
+        prodLogger.debug("Database ready")
         while True:
             try:
                 options(db.conn)

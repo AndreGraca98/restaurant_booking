@@ -339,26 +339,4 @@ def create_restaurant_tables(conn: sqlite3.Connection):
     dbLogger.debug(repr(tables))
 
 
-def prepare_database(clean: bool = False):
-    """Prepares the database
-
-    Args:
-        clean (bool, optional): If True, deletes all tables and recreates them. Defaults to False.
-    """
-    dbLogger.info("Preparing database")
-
-    with Database() as db:
-        if clean:
-            dbLogger.debug("Deleting current database tables")
-            db.delete().create()
-
-        dbLogger.debug("Creating restaurant tables")
-        create_restaurant_tables(db.conn)
-
-        dbLogger.debug("Creating restaurant menu")
-        create_restaurant_menu(db.conn)
-
-        dbLogger.debug("Database ready")
-
-
 # ENDFILE
